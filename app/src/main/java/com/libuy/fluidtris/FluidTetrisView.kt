@@ -765,13 +765,12 @@ internal fun clampPieceX(
     }
     if (minCol == Int.MAX_VALUE) return pieceX
     var x = pieceX
-    val padding = pieceSize * 0.25f  // Keep 1/4 block width from walls (3/4 as close as allowed)
-    // Left wall: leftmost block's left edge must be at or right of the wall + padding
+    // Left wall: leftmost block's left edge must be at or right of the wall
     val leftEdge = x + minCol * pieceSize
-    if (leftEdge < leftWall + padding) x = leftWall + padding - minCol * pieceSize
-    // Right wall: rightmost block's right edge must be at or left of the wall - padding
+    if (leftEdge < leftWall) x = leftWall - minCol * pieceSize
+    // Right wall: rightmost block's right edge must be at or left of the wall
     val rightEdge = x + (maxCol + 1) * pieceSize
-    if (rightEdge > rightWall - padding) x = rightWall - padding - (maxCol + 1) * pieceSize
+    if (rightEdge > rightWall) x = rightWall - (maxCol + 1) * pieceSize
     return x
 }
 
