@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+/test_images/
+/drawable - Shortcut.lnk
