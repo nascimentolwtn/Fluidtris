@@ -27,6 +27,7 @@ class FluidTetrisView @JvmOverloads constructor(
     private val paint = Paint().apply {
         style = Paint.Style.FILL
     }
+    private val jellyRect = RectF()
 
     private val backgroundBitmap: Bitmap =
         BitmapFactory.decodeResource(resources, R.drawable.game_background)
@@ -171,26 +172,11 @@ class FluidTetrisView @JvmOverloads constructor(
 
         // Draw the current piece
         val currentPieceShape = pieces[currentPiece]
-        val pieceSize = 100f // Size of each block
-        canvas.save() // Save the current state of the canvas
-        canvas.rotate(pieceRotation, pieceX + (currentPieceShape[0].size * pieceSize) / 2, pieceY + (currentPieceShape.size * pieceSize) / 2) // Rotate around the center of the piece
-        for (row in currentPieceShape.indices) {
-            for (col in currentPieceShape[row].indices) {
-                if (currentPieceShape[row][col] == 1) { // Only draw filled blocks
-                    val x = pieceX + col * pieceSize
-                    val y = pieceY + row * pieceSize
-                    paint.color = currentPieceColor // Set the color for each block
-                    canvas.drawRect(x, y, x + pieceSize, y + pieceSize, paint)
-                    // Draw border
-                    paint.color = Color.BLACK
-                    paint.style = Paint.Style.STROKE
-                    paint.strokeWidth = 2f
-                    canvas.drawRect(x, y, x + pieceSize, y + pieceSize, paint)
-                    paint.style = Paint.Style.FILL
-                }
-            }
-        }
-        canvas.restore() // Restore the canvas to its previous state
+        val pieceSize = 100f
+        canvas.save()
+        canvas.rotate(pieceRotation, pieceX + (currentPieceShape[0].size * pieceSize) / 2, pieceY + (currentPieceShape.size * pieceSize) / 2)
+        drawJellyPiece(canvas, currentPieceShape, pieceX, pieceY, currentPieceColor, getCollisionSolidity())
+        canvas.restore()
 
         // Draw the next piece preview
         val previewX = width - 200f
@@ -349,6 +335,84 @@ class FluidTetrisView @JvmOverloads constructor(
         }
     }
 
+    private fun getCollisionSolidity(): Float {
+        val elapsed = when {
+            isWaitingToTurnRigidAtBottom -> System.currentTimeMillis() - bottomCollisionTime
+            isWaitingToTurnRigidAtPiece -> System.currentTimeMillis() - pieceCollisionTime
+            else -> return 0f
+        }
+        val t = (elapsed / 3000f).coerceIn(0f, 1f)
+        // Oscillate with sin that trends toward solid (1.0) as t → 1
+        val oscillation = sin(t * Math.PI * 6.0).toFloat()
+        return (t + oscillation * (1f - t) * 0.6f).coerceIn(0f, 1f)
+    }
+
+    private fun drawJellyPiece(
+        canvas: Canvas, shape: List<List<Int>>,
+        startX: Float, startY: Float, color: Int,
+        solidity: Float, blockSize: Float = 100f
+    ) {
+        paint.isAntiAlias = true
+        val jelly = 1f - solidity
+        val cornerRadius = jelly * blockSize * 0.38f + 4f
+        val expand = jelly * blockSize * 0.06f
+        val bridgeInset = blockSize * (0.12f + solidity * 0.14f)
+
+        paint.color = color
+        paint.style = Paint.Style.FILL
+
+        // Bridges fill concave gaps between rounded adjacent blocks
+        for (row in shape.indices) {
+            for (col in shape[row].indices) {
+                if (shape[row][col] != 1) continue
+                val x = startX + col * blockSize
+                val y = startY + row * blockSize
+                if (col + 1 < shape[row].size && shape[row][col + 1] == 1) {
+                    jellyRect.set(x + blockSize * 0.4f, y + bridgeInset, x + blockSize * 1.6f, y + blockSize - bridgeInset)
+                    canvas.drawRoundRect(jellyRect, cornerRadius * 0.4f, cornerRadius * 0.4f, paint)
+                }
+                if (row + 1 < shape.size && shape[row + 1][col] == 1) {
+                    jellyRect.set(x + bridgeInset, y + blockSize * 0.4f, x + blockSize - bridgeInset, y + blockSize * 1.6f)
+                    canvas.drawRoundRect(jellyRect, cornerRadius * 0.4f, cornerRadius * 0.4f, paint)
+                }
+            }
+        }
+
+        // Blocks drawn on top of bridges
+        for (row in shape.indices) {
+            for (col in shape[row].indices) {
+                if (shape[row][col] != 1) continue
+                val x = startX + col * blockSize
+                val y = startY + row * blockSize
+
+                paint.color = color
+                jellyRect.set(x - expand, y - expand, x + blockSize + expand, y + blockSize + expand)
+                canvas.drawRoundRect(jellyRect, cornerRadius, cornerRadius, paint)
+
+                // Bright oval highlight gives jelly sheen
+                if (jelly > 0.05f) {
+                    paint.color = Color.argb((jelly * 90).toInt(), 255, 255, 255)
+                    val hlR = blockSize * 0.18f * jelly
+                    jellyRect.set(x + blockSize * 0.18f, y + blockSize * 0.18f,
+                        x + blockSize * 0.18f + hlR * 2, y + blockSize * 0.18f + hlR * 2)
+                    canvas.drawOval(jellyRect, paint)
+                }
+
+                // Block border fades in as piece solidifies
+                if (solidity > 0.15f) {
+                    paint.color = Color.argb((solidity * 210).toInt(), 0, 0, 0)
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = 2f
+                    jellyRect.set(x, y, x + blockSize, y + blockSize)
+                    canvas.drawRoundRect(jellyRect, 4f, 4f, paint)
+                    paint.style = Paint.Style.FILL
+                }
+            }
+        }
+
+        paint.isAntiAlias = false
+    }
+
     private fun getHitCell(touchX: Float, touchY: Float): Pair<Int, Int>? =
         hitCellFromTouch(touchX, touchY, pieceX, pieceY, pieceRotation, pieces[currentPiece])
 
@@ -457,19 +521,6 @@ class FluidTetrisView @JvmOverloads constructor(
         // Check if game is over
         if (grid[0].any { it != null }) {
             isGameOver = true
-        }
-    }
-
-    private fun rotatePiece(shape: List<List<Int>>, rotation: Float): List<List<Int>> {
-        return when (rotation.toInt() % 360) {
-            90 -> shape.mapIndexed { rowIndex, row ->
-                row.mapIndexed { colIndex, _ -> shape[shape.size - 1 - colIndex][rowIndex] }
-            }
-            180 -> shape.map { it.reversed() }.reversed()
-            270 -> shape.mapIndexed { rowIndex, row ->
-                row.mapIndexed { colIndex, _ -> shape[colIndex][shape.size - 1 - rowIndex] }
-            }
-            else -> shape // No rotation
         }
     }
 
@@ -588,15 +639,19 @@ class FluidTetrisView @JvmOverloads constructor(
             keepPiecesInsideWalls()
             checkCollisions()
 
+            var didSolidify = false
+
             if (isWaitingToTurnRigidAtBottom) {
                 if (System.currentTimeMillis() - bottomCollisionTime >= 3000) {
                     isDragging = false
                     turnPieceRigid()
                     isWaitingToTurnRigidAtBottom = false
+                    isWaitingToTurnRigidAtPiece = false
+                    didSolidify = true
                 }
             }
 
-            if (isWaitingToTurnRigidAtPiece) {
+            if (!didSolidify && isWaitingToTurnRigidAtPiece) {
                 if (System.currentTimeMillis() - pieceCollisionTime >= 3000) {
                     isDragging = false
                     turnPieceRigid()
@@ -721,4 +776,22 @@ internal fun rotationDeltaFromDrag(
     val cross = vx * dy - vy * dx
     val dist2 = vx * vx + vy * vy + 1f
     return cross / dist2 * sensitivity
+}
+
+// Rotate a tetris piece shape around its center. Handles non-square shapes correctly.
+// For 90° CW: (r,c) → (c, rows-1-r) producing a cols×rows output.
+// For 270° CW: (r,c) → (cols-1-c, r) producing a cols×rows output.
+internal fun rotatePiece(shape: List<List<Int>>, rotation: Float): List<List<Int>> {
+    val rows = shape.size
+    val cols = if (rows > 0) shape[0].size else 0
+    return when (rotation.toInt() % 360) {
+        90 -> List(cols) { newRow ->
+            List(rows) { newCol -> shape[rows - 1 - newCol][newRow] }
+        }
+        180 -> shape.map { it.reversed() }.reversed()
+        270 -> List(cols) { newRow ->
+            List(rows) { newCol -> shape[newCol][cols - 1 - newRow] }
+        }
+        else -> shape
+    }
 }
