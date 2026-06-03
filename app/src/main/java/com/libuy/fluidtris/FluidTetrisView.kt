@@ -568,32 +568,8 @@ class FluidTetrisView @JvmOverloads constructor(
     }
 
     private fun keepPiecesInsideWalls() {
-        val currentPieceShape = pieces[currentPiece]
-        val pieceSize = 100f // Size of each block
-
-        // Check if any part of the piece is going outside the left wall
-        for (row in currentPieceShape.indices) {
-            for (col in currentPieceShape[row].indices) {
-                if (currentPieceShape[row][col] == 1) { // Only check filled blocks
-                    val blockX = pieceX + col * pieceSize
-                    if (blockX < 50f) {
-                        pieceX = 50f - col * pieceSize // Snap to the left wall
-                    }
-                }
-            }
-        }
-
-        // Check if any part of the piece is going outside the right wall
-        for (row in currentPieceShape.indices) {
-            for (col in currentPieceShape[row].indices) {
-                if (currentPieceShape[row][col] == 1) { // Only check filled blocks
-                    val blockX = pieceX + col * pieceSize
-                    if (blockX + pieceSize > width - 50f) {
-                        pieceX = width - 50f - (currentPieceShape[0].size - col) * pieceSize // Snap to the right wall
-                    }
-                }
-            }
-        }
+        val shape = rotatePiece(pieces[currentPiece], pieceRotation)
+        pieceX = clampPieceX(shape, pieceX, 50f, width - 50f, 100f)
     }
 
     private fun resetGame() {
@@ -635,4 +611,28 @@ class FluidTetrisView @JvmOverloads constructor(
         // Restart the game loop after a short delay to ensure everything is reset
         handler.postDelayed(updateRunnable, 100)
     }
-} 
+}
+
+internal fun clampPieceX(
+    shape: List<List<Int>>,
+    pieceX: Float,
+    leftWall: Float,
+    rightWall: Float,
+    pieceSize: Float
+): Float {
+    var minCol = Int.MAX_VALUE
+    var maxCol = Int.MIN_VALUE
+    for (row in shape) {
+        for ((col, cell) in row.withIndex()) {
+            if (cell == 1) {
+                if (col < minCol) minCol = col
+                if (col > maxCol) maxCol = col
+            }
+        }
+    }
+    if (minCol == Int.MAX_VALUE) return pieceX
+    var x = pieceX
+    if (x + minCol * pieceSize < leftWall) x = leftWall - minCol * pieceSize
+    if (x + maxCol * pieceSize + pieceSize > rightWall) x = rightWall - maxCol * pieceSize - pieceSize
+    return x
+}
