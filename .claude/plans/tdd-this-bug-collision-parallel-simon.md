@@ -6,7 +6,7 @@ When a piece solidifies (timer fires → `turnPieceRigid()` runs), the game cras
 
 **Observable symptoms**:
 1. **App crashes on solidification**: When a rotated piece locks in (after 3 seconds of contact), the app crashes with `ArrayIndexOutOfBoundsException` and Android closes it.
-2. **Pieces solidify in unrotated form**: When a piece is rotated visually and then locked, it solidifies in its initial unrotated orientation rather than the rotated form the player sees.
+2. **Pieces solidify in unrotated form**: When a piece is rotabotted visually and then locked, it solidifies in its initial unrotated orientation rather than the rotated form the player sees.
 
 **Root cause**: `rotatePiece()` has an incorrect matrix-transpose algorithm that causes `ArrayIndexOutOfBoundsException` for non-square shapes at exactly 90° and 270°. Every piece except O (2×2) is non-square: I (1×4), T/L/J/S/Z (2×3). The crash is exposed at solidification because `turnPieceRigid()` snaps `pieceRotation` to the nearest exact 90° multiple *before* calling `rotatePiece()`.
 
