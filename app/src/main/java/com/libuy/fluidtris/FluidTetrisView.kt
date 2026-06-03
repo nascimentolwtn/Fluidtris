@@ -529,6 +529,50 @@ class FluidTetrisView @JvmOverloads constructor(
         }
     }
 
+    private fun moveUpUntilClear() {
+        val cellWidth = (width - 300f) / gridColumns
+        val cellHeight = (height - 280f) / gridRows
+        val gridLeft = 150f
+        val gridTop = 100f
+        val step = 5f
+        var moved = false
+
+        while (doesPieceCollideWithGridAtY(pieceY, cellWidth, cellHeight)) {
+            pieceY -= step
+            moved = true
+            if (pieceY < gridTop) break
+        }
+
+        if (moved) {
+            keepPiecesInsideWalls()
+        }
+    }
+
+    private fun doesPieceCollideWithGridAtY(testY: Float, cellWidth: Float, cellHeight: Float): Boolean {
+        val gridLeft = 150f
+        val gridTop = 100f
+        val blockSize = 100f
+
+        for ((bx, _) in rotatedBlockCenters(pieces[currentPiece], pieceX, testY, pieceRotation)) {
+            val by = testY + blockSize / 2f
+
+            val corners = listOf(
+                bx - blockSize / 2f to by - blockSize / 2f,
+                bx + blockSize / 2f to by - blockSize / 2f,
+                bx - blockSize / 2f to by + blockSize / 2f,
+                bx + blockSize / 2f to by + blockSize / 2f
+            )
+            for ((cx, cy) in corners) {
+                val cellX = ((cx - gridLeft) / cellWidth).toInt()
+                val cellY = ((cy - gridTop) / cellHeight).toInt()
+                if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
+                    if (grid[cellY][cellX] != null) return true
+                }
+            }
+        }
+        return false
+    }
+
     private fun isPieceAtBottom(): Boolean {
         val gridBottom = height - 180f
         return rotatedBlockCenters(pieces[currentPiece], pieceX, pieceY, pieceRotation)
@@ -643,6 +687,7 @@ class FluidTetrisView @JvmOverloads constructor(
             if (!didSolidify && isWaitingToTurnRigidAtPiece) {
                 if (System.currentTimeMillis() - pieceCollisionTime >= 3000) {
                     isDragging = false
+                    moveUpUntilClear()
                     turnPieceRigid()
                     isWaitingToTurnRigidAtPiece = false
                 }

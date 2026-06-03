@@ -18,13 +18,15 @@ class WallClampTest {
     @Test
     fun leftWallClampsToFirstOccupiedColumn() {
         val result = clampPieceX(iHorizontal, -50f, leftWall, rightWall, pieceSize)
-        assertEquals(leftWall, result, 0.001f)
+        val padding = pieceSize * 0.25f
+        assertEquals(leftWall + padding, result, 0.001f)
     }
 
     @Test
     fun rightWallClamps4WideByFourBlockWidths() {
         val result = clampPieceX(iHorizontal, rightWall, leftWall, rightWall, pieceSize)
-        assertEquals(rightWall - 4 * pieceSize, result, 0.001f)
+        val padding = pieceSize * 0.25f
+        assertEquals(rightWall - padding - 4 * pieceSize, result, 0.001f)
     }
 
     @Test
@@ -32,7 +34,8 @@ class WallClampTest {
         // Core regression: a 1-wide (rotated) piece must stop 1 block from the right wall,
         // not 4 blocks — which would happen if the un-rotated 4-wide shape were used.
         val result = clampPieceX(iVertical, rightWall, leftWall, rightWall, pieceSize)
-        assertEquals(rightWall - pieceSize, result, 0.001f)
+        val padding = pieceSize * 0.25f
+        assertEquals(rightWall - padding - pieceSize, result, 0.001f)
     }
 
     @Test
