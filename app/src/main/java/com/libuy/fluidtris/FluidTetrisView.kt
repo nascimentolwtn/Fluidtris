@@ -261,6 +261,7 @@ class FluidTetrisView @JvmOverloads constructor(
                     val dy = event.y - lastTouchY
                     var appliedDx = 0f
                     var appliedDy = 0f
+                    val prevRotation = pieceRotation
 
                     if (isDraggingCenter) {
                         appliedDx = dx
@@ -308,6 +309,7 @@ class FluidTetrisView @JvmOverloads constructor(
                         if (isPieceCollidingWithAnotherPiece(cellWidth, cellHeight)) {
                             pieceX -= appliedDx
                             pieceY -= appliedDy
+                            pieceRotation = prevRotation
                             isDragging = false
                         }
                     }
