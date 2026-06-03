@@ -12,6 +12,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.sin
 
 class FluidTetrisView @JvmOverloads constructor(
@@ -28,6 +29,9 @@ class FluidTetrisView @JvmOverloads constructor(
     private var pieceY = 0f
     private var pieceRotation = 0f
     private var isDragging = false
+    private var isDraggingCenter = false
+    private var touchedBlockRow = 0
+    private var touchedBlockCol = 0
     private var lastTouchX = 0f
     private var lastTouchY = 0f
 
@@ -40,6 +44,8 @@ class FluidTetrisView @JvmOverloads constructor(
     // Gravity effect
     private val gravity = 9.8f  // This will now be used as a constant speed
     private var velocityY = 0f
+    private val upwardDragFactor = 0.4f   // how much upward drag counteracts gravity
+    private val rotationSensitivity = 30f // degrees per unit of torque
 
     // Game grid: 7 columns by 20 lines
     private val gridColumns = 7
@@ -67,6 +73,17 @@ class FluidTetrisView @JvmOverloads constructor(
         Color.BLUE, // J
         Color.GREEN, // S
         Color.RED // Z
+    )
+
+    // (row, col) pairs in the canonical shape that trigger movement; all other blocks trigger rotation
+    private val pieceCenterCells: List<Set<Pair<Int, Int>>> = listOf(
+        setOf(0 to 1, 0 to 2),                         // I – both middle blocks
+        setOf(0 to 0, 0 to 1, 1 to 0, 1 to 1),         // O – whole piece is movement zone
+        setOf(0 to 1),                                  // T – middle of top bar
+        setOf(0 to 1),                                  // L – middle of long bar
+        setOf(0 to 1),                                  // J – middle of long bar
+        setOf(0 to 1),                                  // S – top middle block
+        setOf(0 to 1),                                  // Z – top middle block
     )
 
     private var currentPiece = 0
@@ -181,7 +198,9 @@ class FluidTetrisView @JvmOverloads constructor(
         canvas.drawPath(previewPath, paint)
         paint.style = Paint.Style.FILL
 
-        // Draw the score and high score
+        // Draw the score and high score with white background for dark mode visibility
+        paint.color = Color.WHITE
+        canvas.drawRect(10f, 5f, 400f, 95f, paint)
         paint.color = Color.BLACK
         paint.textSize = 40f
         canvas.drawText("Score: $score", 20f, 40f, paint)
@@ -212,8 +231,12 @@ class FluidTetrisView @JvmOverloads constructor(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                if (!isPaused && isPointInsidePiece(event.x, event.y)) {
+                val hitCell = getHitCell(event.x, event.y)
+                if (!isPaused && hitCell != null) {
                     isDragging = true
+                    isDraggingCenter = (hitCell in pieceCenterCells[currentPiece])
+                    touchedBlockRow = hitCell.first
+                    touchedBlockCol = hitCell.second
                     lastTouchX = event.x
                     lastTouchY = event.y
                     return true
@@ -233,33 +256,33 @@ class FluidTetrisView @JvmOverloads constructor(
                 if (isDragging) {
                     val dx = event.x - lastTouchX
                     val dy = event.y - lastTouchY
-                    pieceX += dx
-                    pieceY += dy
+                    var appliedDx = 0f
+                    var appliedDy = 0f
 
-                    // Prevent piece from falling over the left and right walls
-                    keepPiecesInsideWalls()
-
-                    // Get the current piece shape and apply rotation
-                    val currentPieceShape = pieces[currentPiece]
-                    val rotatedShape = rotatePiece(currentPieceShape, pieceRotation)
-                    val pieceSize = 100f // Size of each block
-                    val centerY = pieceY + (rotatedShape.size * pieceSize) / 2
-
-                    // Check if the touch is on the top or bottom of the rotated piece
-                    val isTouchingTop = event.y < centerY
-                    val isTouchingBottom = event.y > centerY
-
-                    // Rotate only if dragging horizontally and touching top or bottom
-                    if (Math.abs(dx) > Math.abs(dy)) {
-                        if (isTouchingTop) {
-                            // Apply spring force for rotation when dragging right
-                            springForceX = -dx * springConstant // Apply spring force based on drag
-                            pieceRotation += dx * 0.2f // Increase the multiplier for faster rotation
-                        } else if (isTouchingBottom) {
-                            // Apply spring force for rotation when dragging left
-                            springForceX = dx * springConstant // Apply spring force based on drag
-                            pieceRotation -= dx * 0.2f // Decrease the multiplier for faster rotation
-                        }
+                    if (isDraggingCenter) {
+                        appliedDx = dx
+                        appliedDy = effectiveVerticalDrag(dy, upwardDragFactor)
+                        pieceX += appliedDx
+                        pieceY += appliedDy
+                        keepPiecesInsideWalls()
+                    } else {
+                        // Torque-based rotation: cross product of (block→center) with drag vector
+                        val shape = pieces[currentPiece]
+                        val pieceSize = 100f
+                        val rcx = pieceX + shape[0].size * pieceSize / 2f
+                        val rcy = pieceY + shape.size * pieceSize / 2f
+                        val angle = pieceRotation * Math.PI / 180.0
+                        val cosA = cos(angle)
+                        val sinA = sin(angle)
+                        val bux = pieceX + (touchedBlockCol + 0.5f) * pieceSize
+                        val buy = pieceY + (touchedBlockRow + 0.5f) * pieceSize
+                        val bdx = (bux - rcx).toDouble()
+                        val bdy = (buy - rcy).toDouble()
+                        val bx = (rcx + bdx * cosA - bdy * sinA).toFloat()
+                        val by = (rcy + bdx * sinA + bdy * cosA).toFloat()
+                        val vx = rcx - bx
+                        val vy = rcy - by
+                        pieceRotation -= rotationDeltaFromDrag(vx, vy, dx, dy, rotationSensitivity)
                     }
 
                     lastTouchX = event.x
@@ -269,7 +292,6 @@ class FluidTetrisView @JvmOverloads constructor(
                     val cellX = (pieceX / (width.toFloat() / gridColumns)).toInt()
                     val cellY = (pieceY / (height.toFloat() / gridRows)).toInt()
                     if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
-                        // Calculate grid cell size
                         val cellWidth = (width - 100f) / gridColumns
                         val cellHeight = (height - 250f) / gridRows
 
@@ -279,8 +301,8 @@ class FluidTetrisView @JvmOverloads constructor(
                         }
 
                         if (isPieceCollidingWithAnotherPiece(cellWidth, cellHeight)) {
-                            pieceX -= dx
-                            pieceY -= dy
+                            pieceX -= appliedDx
+                            pieceY -= appliedDy
                             isDragging = false
                         }
                     }
@@ -298,24 +320,8 @@ class FluidTetrisView @JvmOverloads constructor(
         return super.onTouchEvent(event)
     }
 
-    private fun isPointInsidePiece(x: Float, y: Float): Boolean {
-        val currentPieceShape = pieces[currentPiece]
-        val pieceSize = 100f // Size of each block
-
-        for (row in currentPieceShape.indices) {
-            for (col in currentPieceShape[row].indices) {
-                if (currentPieceShape[row][col] == 1) { // Only check filled blocks
-                    val blockX = pieceX + col * pieceSize
-                    val blockY = pieceY + row * pieceSize
-                    // Check if the touch point is within the bounds of the block
-                    if (x >= blockX && x <= blockX + pieceSize && y >= blockY && y <= blockY + pieceSize) {
-                        return true
-                    }
-                }
-            }
-        }
-        return false
-    }
+    private fun getHitCell(touchX: Float, touchY: Float): Pair<Int, Int>? =
+        hitCellFromTouch(touchX, touchY, pieceX, pieceY, pieceRotation, pieces[currentPiece])
 
     private fun checkLines() {
         var linesCleared = 0
@@ -534,32 +540,29 @@ class FluidTetrisView @JvmOverloads constructor(
 
     // Update method to handle gravity
     fun update() {
-        if (!isDragging && !isPaused && !isGameOver) {
-            // Only apply gravity if not waiting to turn rigid
-            if (!isWaitingToTurnRigidAtBottom && !isWaitingToTurnRigidAtPiece) {
-                // Apply constant vertical speed
-                pieceY += gravity // * 0.016f  // Multiply by frame time (approximately 1/60)
+        if (!isPaused && !isGameOver) {
+            // Holding the movement block pauses gravity; rotation drag or no touch does not
+            if (!isWaitingToTurnRigidAtBottom && !isWaitingToTurnRigidAtPiece
+                && !(isDragging && isDraggingCenter)) {
+                pieceY += gravity
             }
 
-            // Prevent piece from falling over the left and right walls
             keepPiecesInsideWalls()
-
-            // Check for collision
             checkCollisions()
 
-            // Handle waiting to turn rigid at the bottom
             if (isWaitingToTurnRigidAtBottom) {
-                if (System.currentTimeMillis() - bottomCollisionTime >= 3000) { // 3 seconds
-                    turnPieceRigid() // Turn the piece rigid after 3 seconds
-                    isWaitingToTurnRigidAtBottom = false // Reset the waiting state
+                if (System.currentTimeMillis() - bottomCollisionTime >= 3000) {
+                    isDragging = false
+                    turnPieceRigid()
+                    isWaitingToTurnRigidAtBottom = false
                 }
             }
 
-            // Handle waiting to turn rigid at another piece
             if (isWaitingToTurnRigidAtPiece) {
-                if (System.currentTimeMillis() - pieceCollisionTime >= 3000) { // 3 seconds
-                    turnPieceRigid() // Turn the piece rigid after 3 seconds
-                    isWaitingToTurnRigidAtPiece = false // Reset the waiting state
+                if (System.currentTimeMillis() - pieceCollisionTime >= 3000) {
+                    isDragging = false
+                    turnPieceRigid()
+                    isWaitingToTurnRigidAtPiece = false
                 }
             }
 
@@ -588,6 +591,9 @@ class FluidTetrisView @JvmOverloads constructor(
         isGameOver = false
         isPaused = false
         isDragging = false
+        isDraggingCenter = false
+        touchedBlockRow = 0
+        touchedBlockCol = 0
         springForceX = 0f
         springForceY = 0f
         velocityY = 0f
@@ -635,4 +641,46 @@ internal fun clampPieceX(
     if (x + minCol * pieceSize < leftWall) x = leftWall - minCol * pieceSize
     if (x + maxCol * pieceSize + pieceSize > rightWall) x = rightWall - maxCol * pieceSize - pieceSize
     return x
+}
+
+// Maps a touch point to the canonical (row, col) of the hit block, accounting for pieceRotation.
+// Returns null if the touch is outside all filled blocks.
+internal fun hitCellFromTouch(
+    touchX: Float,
+    touchY: Float,
+    pieceX: Float,
+    pieceY: Float,
+    pieceRotation: Float,
+    shape: List<List<Int>>,
+    pieceSize: Float = 100f
+): Pair<Int, Int>? {
+    val rcx = pieceX + shape[0].size * pieceSize / 2f
+    val rcy = pieceY + shape.size * pieceSize / 2f
+    val angle = -pieceRotation * Math.PI / 180.0
+    val cosA = cos(angle)
+    val sinA = sin(angle)
+    val dx = (touchX - rcx).toDouble()
+    val dy = (touchY - rcy).toDouble()
+    val ux = (rcx + dx * cosA - dy * sinA).toFloat()
+    val uy = (rcy + dx * sinA + dy * cosA).toFloat()
+    val col = floor((ux - pieceX) / pieceSize).toInt()
+    val row = floor((uy - pieceY) / pieceSize).toInt()
+    if (row in shape.indices && col in shape[0].indices && shape[row][col] == 1) {
+        return row to col
+    }
+    return null
+}
+
+// Upward drag is attenuated so the player can slow the fall but not reverse it.
+internal fun effectiveVerticalDrag(dy: Float, upwardDragFactor: Float): Float =
+    if (dy < 0f) dy * upwardDragFactor else dy
+
+// Torque formula: cross product of (block→center) with drag vector, normalised by distance².
+// The caller subtracts the result from pieceRotation.
+internal fun rotationDeltaFromDrag(
+    vx: Float, vy: Float, dx: Float, dy: Float, sensitivity: Float
+): Float {
+    val cross = vx * dy - vy * dx
+    val dist2 = vx * vx + vy * vy + 1f
+    return cross / dist2 * sensitivity
 }
