@@ -40,8 +40,8 @@
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
 ## Backlog
-1. **[refactor] God Object split — Thin View + Game Engine** — plan at `.claude/plans/plan-a-refactoring-on-nifty-avalanche.md`; splits `FluidTetrisView.kt` (723 lines) into `GameConstants`, `GameMath`, `SoundManager`, `GameEngine`, thin `FluidTetrisView`.
-2. **[bug] `keepPiecesInsideWalls` still uses logical column indices of rotated shape** — `clampPieceX` receives the result of `rotatePiece()` and uses col indices × 100f; this is an approximation that breaks at non-90° angles. Fix: switch to `rotatedBlockCenters()` for min/max X.
+1. **[feature] Solid-on-solid prevention** — when a fluid piece would become solid (3s contact) on top of another solid piece, move it upward against gravity until it finds a valid resting point (floor or above another solid). Prevents pieces from fusing mid-grid.
+2. **[refactor] God Object split — Thin View + Game Engine** — plan at `.claude/plans/plan-a-refactoring-on-nifty-avalanche.md`; splits `FluidTetrisView.kt` (723 lines) into `GameConstants`, `GameMath`, `SoundManager`, `GameEngine`, thin `FluidTetrisView`.
 3. **[bug] High score resets on app close** — `highScore` is in-memory only; persist via `SharedPreferences`.
 4. **[cleanup] `collideWithAnotherPiece()` is dead code** — audit timer logic in `checkCollisions()` before deciding to wire it up or delete it.
 5. **[feature] Spring physics wiring** — `springForceX/Y`, `springConstant`, `damping` are scaffolded but never applied; connect to movement/rotation if spring feel is desired.
