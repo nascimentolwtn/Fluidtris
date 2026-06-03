@@ -473,13 +473,10 @@ class FluidTetrisView @JvmOverloads constructor(
         // Play sound effect for rigid transformation
         rigidSoundPlayer?.start()
 
-        // Normalize rotation to 0, 90, 180, or 360 degrees
-        pieceRotation = when {
-            pieceRotation < 0 -> 360f + pieceRotation % 360 // Normalize to positive
-            pieceRotation >= 360 -> pieceRotation % 360 // Normalize to 0-360
-            pieceRotation % 90 != 0f -> (pieceRotation / 90).toInt() * 90f // Snap to nearest 90 degrees
-            else -> pieceRotation
-        }
+        // Normalize to [0, 360) then snap to nearest 90°
+        var normalized = pieceRotation % 360f
+        if (normalized < 0f) normalized += 360f
+        pieceRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
 
         // Calculate grid cell size (matches grid boundaries: left=150f, right=width-150f, top=100f, bottom=height-180f)
         val cellWidth = (width - 300f) / gridColumns
