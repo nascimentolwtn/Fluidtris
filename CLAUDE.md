@@ -46,7 +46,7 @@ The entire game is implemented in two files:
 
 **Sound**: Two `MediaPlayer` instances — `move_sound.ogg` (line clear) and `rigid_sound.wav` (piece lock). Loaded from `res/raw/`.
 
-**Rendering**: All drawing is done imperatively in `onDraw()` using `Canvas` and a single reused `Paint` object. The next-piece preview currently renders only a colored square (not the actual piece shape).
+**Rendering**: All drawing is done imperatively in `onDraw()` using `Canvas` and a single reused `Paint` object. The background image is drawn as the first call in `onDraw()`, scaled to fill the entire screen. The next-piece preview currently renders only a colored square (not the actual piece shape).
 
 ## Known Issues / Design Notes
 

@@ -1,10 +1,13 @@
 package com.libuy.fluidtris
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
@@ -24,6 +27,9 @@ class FluidTetrisView @JvmOverloads constructor(
     private val paint = Paint().apply {
         style = Paint.Style.FILL
     }
+
+    private val backgroundBitmap: Bitmap =
+        BitmapFactory.decodeResource(resources, R.drawable.game_background)
 
     private var pieceX = 0f
     private var pieceY = 0f
@@ -127,11 +133,16 @@ class FluidTetrisView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        // Define grid area
-        val gridLeft = 50f
-        val gridTop = 50f
-        val gridRight = width - 50f
-        val gridBottom = height - 200f
+
+        // Draw background
+        canvas.drawBitmap(backgroundBitmap, null,
+            RectF(0f, 0f, width.toFloat(), height.toFloat()), null)
+
+        // Define grid area (centered within the "glass" dark area of the background)
+        val gridLeft = 150f
+        val gridTop = 100f
+        val gridRight = width - 150f
+        val gridBottom = height - 180f
         val cellWidth = (gridRight - gridLeft) / gridColumns
         val cellHeight = (gridBottom - gridTop) / gridRows
 
@@ -199,33 +210,38 @@ class FluidTetrisView @JvmOverloads constructor(
         canvas.drawPath(previewPath, paint)
         paint.style = Paint.Style.FILL
 
-        // Draw the score and high score with white background for dark mode visibility
-        paint.color = Color.WHITE
+        // Draw the score and high score with semi-transparent background
+        paint.color = Color.argb(180, 20, 60, 100)  // Dark teal overlay
         canvas.drawRect(10f, 5f, 400f, 95f, paint)
-        paint.color = Color.BLACK
+        paint.color = Color.argb(255, 100, 220, 200)  // Cyan-teal text
         paint.textSize = 40f
         canvas.drawText("Score: $score", 20f, 40f, paint)
         canvas.drawText("High Score: $highScore", 20f, 80f, paint)
 
-        // Draw the new game and pause buttons
-        paint.color = Color.BLUE
+        // Draw the new game and pause buttons with thematic colors
+        paint.color = Color.argb(200, 50, 150, 130)  // Teal button
         canvas.drawRect(20f, height - 150f, 200f, height - 50f, paint)
-        paint.color = Color.WHITE
+        paint.color = Color.argb(255, 200, 240, 230)  // Light text
         paint.textSize = 30f
-        canvas.drawText("New Game", 40f, height - 100f, paint)
+        canvas.drawText("New Game", 35f, height - 100f, paint)
 
-        paint.color = Color.RED
+        paint.color = Color.argb(200, 100, 150, 180)  // Blue button
         canvas.drawRect(width - 200f, height - 150f, width - 20f, height - 50f, paint)
-        paint.color = Color.WHITE
-        canvas.drawText("Pause", width - 180f, height - 100f, paint)
+        paint.color = Color.argb(255, 200, 240, 230)  // Light text
+        canvas.drawText("Pause", width - 160f, height - 100f, paint)
 
         // Draw game over screen if game is over
         if (isGameOver) {
-            paint.color = Color.RED
+            // Semi-transparent overlay
+            paint.color = Color.argb(150, 20, 40, 80)
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+
+            paint.color = Color.argb(255, 150, 200, 220)  // Light blue text
             paint.textSize = 80f
-            canvas.drawText("Game Over", width / 2 - 200f, height / 2 - 50f, paint)
+            canvas.drawText("Game Over", width / 2 - 250f, height / 2 - 50f, paint)
             paint.textSize = 60f
-            canvas.drawText("High Score: $highScore", width / 2 - 200f, height / 2 + 50f, paint)
+            paint.color = Color.argb(255, 120, 200, 220)
+            canvas.drawText("High Score: $highScore", width / 2 - 250f, height / 2 + 80f, paint)
         }
     }
 
@@ -290,11 +306,13 @@ class FluidTetrisView @JvmOverloads constructor(
                     lastTouchY = event.y
 
                     // Check for collision and update grid
-                    val cellX = (pieceX / (width.toFloat() / gridColumns)).toInt()
-                    val cellY = (pieceY / (height.toFloat() / gridRows)).toInt()
+                    val cellWidth = (width - 300f) / gridColumns
+                    val cellHeight = (height - 280f) / gridRows
+                    val gridLeft = 150f
+                    val gridTop = 100f
+                    val cellX = ((pieceX - gridLeft) / cellWidth).toInt()
+                    val cellY = ((pieceY - gridTop) / cellHeight).toInt()
                     if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
-                        val cellWidth = (width - 100f) / gridColumns
-                        val cellHeight = (height - 250f) / gridRows
 
                         if (isPieceAtBottom()) {
                             isDragging = false
@@ -358,9 +376,9 @@ class FluidTetrisView @JvmOverloads constructor(
     }
 
     private fun checkCollisions() {
-        // Calculate grid cell size
-        val cellWidth = (width - 100f) / gridColumns
-        val cellHeight = (height - 250f) / gridRows
+        // Calculate grid cell size (matches grid boundaries: left=150f, right=width-150f, top=100f, bottom=height-180f)
+        val cellWidth = (width - 300f) / gridColumns
+        val cellHeight = (height - 280f) / gridRows
 
         // Check for collision with the bottom
         if (isPieceAtBottom()) {
@@ -397,20 +415,22 @@ class FluidTetrisView @JvmOverloads constructor(
             else -> pieceRotation
         }
 
-        // Calculate grid cell size
-        val cellWidth = (width - 100f) / gridColumns
-        val cellHeight = (height - 250f) / gridRows
+        // Calculate grid cell size (matches grid boundaries: left=150f, right=width-150f, top=100f, bottom=height-180f)
+        val cellWidth = (width - 300f) / gridColumns
+        val cellHeight = (height - 280f) / gridRows
 
         // Get the current piece shape and apply rotation
         val currentPieceShape = pieces[currentPiece]
         val rotatedShape = rotatePiece(currentPieceShape, pieceRotation)
+        val gridLeft = 150f
+        val gridTop = 100f
 
         // Place the current piece in the grid based on its last position and shape
         for (row in rotatedShape.indices) {
             for (col in rotatedShape[row].indices) {
                 if (rotatedShape[row][col] == 1) { // Only check filled blocks
-                    val gridX = ((pieceX + col * 100f) / cellWidth).toInt()
-                    val gridY = ((pieceY + row * 100f) / cellHeight).toInt()
+                    val gridX = ((pieceX - gridLeft + col * 100f) / cellWidth).toInt()
+                    val gridY = ((pieceY - gridTop + row * 100f) / cellHeight).toInt()
 
                     // Only place piece if it's within grid bounds
                     if (gridX in 0 until gridColumns && gridY in 0 until gridRows) {
@@ -456,14 +476,15 @@ class FluidTetrisView @JvmOverloads constructor(
     private fun isPieceAtBottom(): Boolean {
         val currentPieceShape = pieces[currentPiece]
         val pieceSize = 100f // Size of each block
-        val cellHeight = (height - 250f) / gridRows // Calculate grid cell height
+        val gridBottom = height - 180f // Grid bottom boundary matches onDraw()
+        val cellHeight = (gridBottom - 100f) / gridRows // Calculate grid cell height (gridTop = 100f)
 
         for (row in currentPieceShape.indices) {
             for (col in currentPieceShape[row].indices) {
                 if (currentPieceShape[row][col] == 1) { // Only check filled blocks
                     val blockY = pieceY + row * pieceSize
                     // Check if any part of the piece is at or below the bottom of the grid
-                    if (blockY + pieceSize > height - 200f) {
+                    if (blockY + pieceSize > gridBottom) {
                         return true // Piece is at the bottom
                     }
                 }
@@ -474,12 +495,14 @@ class FluidTetrisView @JvmOverloads constructor(
 
     private fun collideAtBottom(cellWidth: Float, cellHeight: Float) {
         val currentPieceShape = pieces[currentPiece]
+        val gridLeft = 150f
+        val gridTop = 100f
 
         for (row in currentPieceShape.indices) {
             for (col in currentPieceShape[row].indices) {
                 if (currentPieceShape[row][col] == 1) { // Only check filled blocks
-                    val gridX = ((pieceX + col * 100f) / cellWidth).toInt()
-                    val gridY = ((pieceY + row * 100f) / cellHeight).toInt()
+                    val gridX = ((pieceX - gridLeft + col * 100f) / cellWidth).toInt()
+                    val gridY = ((pieceY - gridTop + row * 100f) / cellHeight).toInt()
 
                     // Only place piece if it's within grid bounds
                     if (gridX in 0 until gridColumns && gridY in 0 until gridRows) {
@@ -494,13 +517,15 @@ class FluidTetrisView @JvmOverloads constructor(
     private fun isPieceCollidingWithAnotherPiece(cellWidth: Float, cellHeight: Float): Boolean {
         // Get the rotated shape of the current piece
         val rotatedShape = rotatePiece(pieces[currentPiece], pieceRotation)
+        val gridLeft = 150f
+        val gridTop = 100f
 
         // Check for collision with other rigid pieces
         for (row in rotatedShape.indices) {
             for (col in rotatedShape[row].indices) {
                 if (rotatedShape[row][col] == 1) { // Only check filled blocks
-                    val cellX = ((pieceX + col * 100f) / cellWidth).toInt()
-                    val cellY = ((pieceY + row * 100f) / cellHeight).toInt()
+                    val cellX = ((pieceX - gridLeft + col * 100f) / cellWidth).toInt()
+                    val cellY = ((pieceY - gridTop + row * 100f) / cellHeight).toInt()
 
                     // Check if the piece is colliding with the grid cell
                     if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
@@ -517,13 +542,15 @@ class FluidTetrisView @JvmOverloads constructor(
     private fun collideWithAnotherPiece(cellWidth: Float, cellHeight: Float) {
         // Get the rotated shape of the current piece
         val rotatedShape = rotatePiece(pieces[currentPiece], pieceRotation)
+        val gridLeft = 150f
+        val gridTop = 100f
 
         // Check for collision with other rigid pieces
         for (row in rotatedShape.indices) {
             for (col in rotatedShape[row].indices) {
                 if (rotatedShape[row][col] == 1) { // Only check filled blocks
-                    val cellX = ((pieceX + col * 100f) / cellWidth).toInt()
-                    val cellY = ((pieceY + row * 100f) / cellHeight).toInt()
+                    val cellX = ((pieceX - gridLeft + col * 100f) / cellWidth).toInt()
+                    val cellY = ((pieceY - gridTop + row * 100f) / cellHeight).toInt()
 
                     // Check if the piece is colliding with the grid cell
                     if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
@@ -583,7 +610,7 @@ class FluidTetrisView @JvmOverloads constructor(
 
     private fun keepPiecesInsideWalls() {
         val shape = rotatePiece(pieces[currentPiece], pieceRotation)
-        pieceX = clampPieceX(shape, pieceX, 50f, width - 50f, 100f)
+        pieceX = clampPieceX(shape, pieceX, 150f, width - 150f, 100f)
     }
 
     private fun resetGame() {
