@@ -98,14 +98,12 @@ class FluidTetrisView @JvmOverloads constructor(
     private var nextPiece = 1
     private var nextPieceColor = pieceColors[1]
 
-    // Sound effects
-    private var mediaPlayer: MediaPlayer? = null
-    private var rigidSoundPlayer: MediaPlayer? = null
 
     // Game state
     private var isPaused = false
     private var isGameOver = false
     private var wasManuallyPausedBeforeSystemPause = false
+    private var soundEnabled = true
 
     // Game loop
     private val handler = Handler(Looper.getMainLooper())
@@ -123,9 +121,6 @@ class FluidTetrisView @JvmOverloads constructor(
     private var isWaitingToTurnRigidAtPiece = false
 
     init {
-        // Initialize sound effects
-        mediaPlayer = MediaPlayer.create(context, R.raw.move_sound)
-        rigidSoundPlayer = MediaPlayer.create(context, R.raw.rigid_sound)
         // Initialize game state
         resetGame()
         // Start the game loop
@@ -204,6 +199,14 @@ class FluidTetrisView @JvmOverloads constructor(
         canvas.drawText("Score: $score", 20f, 40f, paint)
         canvas.drawText("High Score: $highScore", 20f, 80f, paint)
 
+        // Draw the sound toggle button
+        paint.color = Color.argb(200, 80, 120, 150)  // Blue-teal button
+        canvas.drawRect(10f, 100f, 280f, 200f, paint)
+        paint.color = Color.argb(255, 200, 240, 230)  // Light text
+        paint.textSize = 32f
+        val soundText = if (soundEnabled) "Sound: ON" else "Sound: OFF"
+        canvas.drawText(soundText, 30f, 155f, paint)
+
         // Draw the new game and pause buttons with thematic colors
         paint.color = Color.argb(200, 50, 150, 130)  // Teal button
         canvas.drawRect(20f, height - 150f, 200f, height - 50f, paint)
@@ -242,6 +245,12 @@ class FluidTetrisView @JvmOverloads constructor(
                     touchedBlockCol = hitCell.second
                     lastTouchX = event.x
                     lastTouchY = event.y
+                    return true
+                }
+                // Check if the sound toggle button is pressed
+                if (event.x in 10f..280f && event.y in 100f..200f) {
+                    soundEnabled = !soundEnabled
+                    invalidate()
                     return true
                 }
                 // Check if the new game button is pressed
@@ -443,7 +452,9 @@ class FluidTetrisView @JvmOverloads constructor(
                 highScore = score
             }
             // Play sound effect for line clear
-            mediaPlayer?.start()
+            if (soundEnabled) {
+                playSound(R.raw.move_sound)
+            }
         }
     }
 
@@ -477,7 +488,9 @@ class FluidTetrisView @JvmOverloads constructor(
 
     private fun turnPieceRigid() {
         // Play sound effect for rigid transformation
-        rigidSoundPlayer?.start()
+        if (soundEnabled) {
+            playSound(R.raw.rigid_sound)
+        }
 
         // Normalize to [0, 360) then snap to nearest 90°
         var normalized = pieceRotation % 360f
@@ -698,14 +711,14 @@ class FluidTetrisView @JvmOverloads constructor(
     }
 
     private fun keepPiecesInsideWalls() {
-        val shape = rotatePiece(pieces[currentPiece], pieceRotation)
-        pieceX = clampPieceX(shape, pieceX, 150f, width - 150f, 100f)
+        val centers = rotatedBlockCenters(pieces[currentPiece], pieceX, pieceY, pieceRotation)
+        pieceX = clampPieceXByCenters(centers, pieceX, 150f, width - 150f, 50f)
     }
 
     private fun resetGame() {
         // Stop the game loop
         handler.removeCallbacks(updateRunnable)
-        
+
         // First, clear the grid completely
         for (i in 0 until gridRows) {
             for (j in 0 until gridColumns) {
@@ -727,22 +740,32 @@ class FluidTetrisView @JvmOverloads constructor(
         pieceRotation = 0f
         lastTouchX = 0f
         lastTouchY = 0f
-        
+
         // Reset piece types and colors
         currentPiece = 0
         currentPieceColor = pieceColors[0]
         nextPiece = 1
         nextPieceColor = pieceColors[1]
-        
+
         // Reset piece position
         pieceX = (width / 2) - 50f  // Center horizontally
         pieceY = 100f  // Start at the top
-        
+
         // Force a redraw
         invalidate()
-        
+
         // Restart the game loop after a short delay to ensure everything is reset
         handler.postDelayed(updateRunnable, 100)
+    }
+
+    private fun playSound(soundResId: Int) {
+        try {
+            val sound = MediaPlayer.create(context, soundResId)
+            sound?.setOnCompletionListener { mp -> mp.release() }
+            sound?.start()
+        } catch (e: Exception) {
+            // Silently ignore sound playback errors
+        }
     }
 }
 
@@ -814,6 +837,22 @@ internal fun rotationDeltaFromDrag(
     val cross = vx * dy - vy * dx
     val dist2 = vx * vx + vy * vy + 1f
     return cross / dist2 * sensitivity
+}
+
+internal fun clampPieceXByCenters(
+    centers: List<Pair<Float, Float>>,
+    pieceX: Float,
+    leftWall: Float,
+    rightWall: Float,
+    halfBlock: Float
+): Float {
+    if (centers.isEmpty()) return pieceX
+    val minBx = centers.minOf { it.first } - halfBlock
+    val maxBx = centers.maxOf { it.first } + halfBlock
+    var x = pieceX
+    if (minBx < leftWall) x += leftWall - minBx
+    if (maxBx > rightWall) x -= maxBx - rightWall
+    return x
 }
 
 // Returns the screen-space center of each filled block after applying the canvas rotation transform.
