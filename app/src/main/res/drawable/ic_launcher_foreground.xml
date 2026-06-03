@@ -4,27 +4,103 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
+
+    <!--
+        L-tetromino (16×16 blocks, 3 gap) — bounding box (37,22)→(72,76), centered at (54,49).
+        Left column: x=37, rows at y=22, 41, 60. Right foot: x=56, y=60.
+        Each block: rounded rect r=2 traced clockwise.
+
+        Draw order: blocks first, then waves on top — bottom blocks appear partially submerged.
+    -->
+
+    <!-- Block 1 (top of left column) -->
+    <path android:pathData="M39,22 h12 a2,2 0 0 1 2,2 v12 a2,2 0 0 1 -2,2 h-12 a2,2 0 0 1 -2,-2 v-12 a2,2 0 0 1 2,-2 z">
         <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="85.84757"
-                android:endY="92.4963"
-                android:startX="42.9492"
-                android:startY="49.59793"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
+            <gradient android:type="linear"
+                android:startX="37" android:startY="22"
+                android:endX="53" android:endY="38">
+                <item android:offset="0.0" android:color="#FF80DEEA"/>
+                <item android:offset="1.0" android:color="#FF00838F"/>
             </gradient>
         </aapt:attr>
     </path>
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
-        android:strokeWidth="1"
-        android:strokeColor="#00000000" />
+    <path android:fillColor="#40FFFFFF"
+        android:pathData="M39,22 h12 a2,2 0 0 1 2,2 v5 h-16 v-5 a2,2 0 0 1 2,-2 z"/>
+
+    <!-- Block 2 (middle of left column) -->
+    <path android:pathData="M39,41 h12 a2,2 0 0 1 2,2 v12 a2,2 0 0 1 -2,2 h-12 a2,2 0 0 1 -2,-2 v-12 a2,2 0 0 1 2,-2 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="37" android:startY="41"
+                android:endX="53" android:endY="57">
+                <item android:offset="0.0" android:color="#FF80DEEA"/>
+                <item android:offset="1.0" android:color="#FF00838F"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:fillColor="#40FFFFFF"
+        android:pathData="M39,41 h12 a2,2 0 0 1 2,2 v5 h-16 v-5 a2,2 0 0 1 2,-2 z"/>
+
+    <!-- Block 3 (bottom-left) — bottom edge just touches water surface -->
+    <path android:pathData="M39,60 h12 a2,2 0 0 1 2,2 v12 a2,2 0 0 1 -2,2 h-12 a2,2 0 0 1 -2,-2 v-12 a2,2 0 0 1 2,-2 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="37" android:startY="60"
+                android:endX="53" android:endY="76">
+                <item android:offset="0.0" android:color="#FF80DEEA"/>
+                <item android:offset="1.0" android:color="#FF00838F"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:fillColor="#40FFFFFF"
+        android:pathData="M39,60 h12 a2,2 0 0 1 2,2 v5 h-16 v-5 a2,2 0 0 1 2,-2 z"/>
+
+    <!-- Block 4 (bottom-right foot) -->
+    <path android:pathData="M58,60 h12 a2,2 0 0 1 2,2 v12 a2,2 0 0 1 -2,2 h-12 a2,2 0 0 1 -2,-2 v-12 a2,2 0 0 1 2,-2 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="56" android:startY="60"
+                android:endX="72" android:endY="76">
+                <item android:offset="0.0" android:color="#FF80DEEA"/>
+                <item android:offset="1.0" android:color="#FF00838F"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:fillColor="#40FFFFFF"
+        android:pathData="M58,60 h12 a2,2 0 0 1 2,2 v5 h-16 v-5 a2,2 0 0 1 2,-2 z"/>
+
+    <!-- Back wave — crests (Q control y=75) reach ~y=78, just grazing block bottoms -->
+    <path android:pathData="M0,81 Q13.5,75 27,81 Q40.5,87 54,81 Q67.5,75 81,81 Q94.5,87 108,81 L108,108 L0,108 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="54" android:startY="78"
+                android:endX="54" android:endY="108">
+                <item android:offset="0.0" android:color="#FF1565C0"/>
+                <item android:offset="1.0" android:color="#FF0D3B8E"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Front wave — lower, lighter blue, adds depth -->
+    <path android:pathData="M0,86 Q27,80 54,86 Q81,92 108,86 L108,108 L0,108 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="54" android:startY="83"
+                android:endX="54" android:endY="108">
+                <item android:offset="0.0" android:color="#FF0288D1"/>
+                <item android:offset="1.0" android:color="#FF01579B"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Water ripples on surface, centered at x=54 (horizontal center of L foot) -->
+    <path android:fillColor="#00000000"
+        android:strokeColor="#6600E5FF"
+        android:strokeWidth="1.2"
+        android:pathData="M46,81 a8,3.5 0 0 0 16,0"/>
+    <path android:fillColor="#00000000"
+        android:strokeColor="#3300E5FF"
+        android:strokeWidth="0.8"
+        android:pathData="M41,81 a13,5 0 0 0 26,0"/>
+
 </vector>
