@@ -287,6 +287,12 @@ class FluidTetrisView @JvmOverloads constructor(
                         val vx = rcx - bx
                         val vy = rcy - by
                         pieceRotation -= rotationDeltaFromDrag(vx, vy, dx, dy, rotationSensitivity)
+                        // Also translate while rotating
+                        appliedDx = dx
+                        appliedDy = effectiveVerticalDrag(dy, upwardDragFactor)
+                        pieceX += appliedDx
+                        pieceY += appliedDy
+                        keepPiecesInsideWalls()
                     }
 
                     lastTouchX = event.x
