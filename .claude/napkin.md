@@ -39,5 +39,8 @@
 3. **[2026-06-02] Rotation gesture: top-half drag = clockwise, bottom-half = counter-clockwise**
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
-## User Directives
-_(none yet — add as preferences are expressed)_
+## Backlog
+1. **[bug] Rotation wall-check uses un-rotated shape** — `keepPiecesInsideWalls` doesn't account for rotated piece shape; fix requires calling `rotatePiece()` before clamping.
+2. **[bug] High score resets on app close** — `highScore` is in-memory only; persist via `SharedPreferences`.
+3. **[cleanup] `collideWithAnotherPiece()` is dead code** — audit timer logic in `checkCollisions()` before deciding to wire it up or delete it.
+4. **[feature] Spring physics wiring** — `springForceX/Y`, `springConstant`, `damping` are scaffolded but never applied; connect to movement/rotation if spring feel is desired.
