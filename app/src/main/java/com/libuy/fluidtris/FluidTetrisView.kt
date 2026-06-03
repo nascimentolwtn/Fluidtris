@@ -498,8 +498,8 @@ class FluidTetrisView @JvmOverloads constructor(
         for (row in rotatedShape.indices) {
             for (col in rotatedShape[row].indices) {
                 if (rotatedShape[row][col] == 1) { // Only check filled blocks
-                    val gridX = ((pieceX - gridLeft + col * 100f) / cellWidth).toInt()
-                    val gridY = ((pieceY - gridTop + row * 100f) / cellHeight).toInt()
+                    val gridX = ((pieceX + col * 100f + 50f - gridLeft) / cellWidth).toInt()
+                    val gridY = ((pieceY + row * 100f + 50f - gridTop) / cellHeight).toInt()
 
                     // Only place piece if it's within grid bounds
                     if (gridX in 0 until gridColumns && gridY in 0 until gridRows) {
@@ -587,8 +587,8 @@ class FluidTetrisView @JvmOverloads constructor(
         for (row in currentPieceShape.indices) {
             for (col in currentPieceShape[row].indices) {
                 if (currentPieceShape[row][col] == 1) { // Only check filled blocks
-                    val gridX = ((pieceX - gridLeft + col * 100f) / cellWidth).toInt()
-                    val gridY = ((pieceY - gridTop + row * 100f) / cellHeight).toInt()
+                    val gridX = ((pieceX + col * 100f + 50f - gridLeft) / cellWidth).toInt()
+                    val gridY = ((pieceY + row * 100f + 50f - gridTop) / cellHeight).toInt()
 
                     // Only place piece if it's within grid bounds
                     if (gridX in 0 until gridColumns && gridY in 0 until gridRows) {
