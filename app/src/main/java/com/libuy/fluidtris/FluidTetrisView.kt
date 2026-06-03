@@ -42,7 +42,7 @@ class FluidTetrisView @JvmOverloads constructor(
     private val damping = 0.9f
 
     // Gravity effect
-    private val gravity = 9.8f  // This will now be used as a constant speed
+    private val gravity = 2.0f  // px/frame; at 60 fps a piece takes ~16 s to cross the grid
     private var velocityY = 0f
     private val upwardDragFactor = 0.4f   // how much upward drag counteracts gravity
     private val rotationSensitivity = 30f // degrees per unit of torque
@@ -98,6 +98,7 @@ class FluidTetrisView @JvmOverloads constructor(
     // Game state
     private var isPaused = false
     private var isGameOver = false
+    private var wasManuallyPausedBeforeSystemPause = false
 
     // Game loop
     private val handler = Handler(Looper.getMainLooper())
@@ -318,6 +319,16 @@ class FluidTetrisView @JvmOverloads constructor(
             }
         }
         return super.onTouchEvent(event)
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (!hasWindowFocus) {
+            wasManuallyPausedBeforeSystemPause = isPaused
+            isPaused = true
+        } else {
+            isPaused = wasManuallyPausedBeforeSystemPause
+        }
     }
 
     private fun getHitCell(touchX: Float, touchY: Float): Pair<Int, Int>? =
@@ -541,9 +552,9 @@ class FluidTetrisView @JvmOverloads constructor(
     // Update method to handle gravity
     fun update() {
         if (!isPaused && !isGameOver) {
-            // Holding the movement block pauses gravity; rotation drag or no touch does not
+            // Any active drag (movement or rotation) pauses gravity; resumes on finger lift
             if (!isWaitingToTurnRigidAtBottom && !isWaitingToTurnRigidAtPiece
-                && !(isDragging && isDraggingCenter)) {
+                && !isDragging) {
                 pieceY += gravity
             }
 

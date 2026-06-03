@@ -125,11 +125,20 @@ class TouchControlTest {
 
     @Test
     fun effectiveDrag_upward_cannotExceedGravity() {
-        // With factor 0.4 the attenuated drag is always less than the raw value,
-        // so gravity (9.8/frame) is never fully cancelled by a single event.
+        // With factor 0.4 the attenuated drag is always less negative than raw,
+        // so gravity (2.0f/frame) is never fully cancelled by a single drag event.
         val rawUpward = -100f
         val effective = effectiveVerticalDrag(rawUpward, 0.4f)
         assert(effective > rawUpward) { "Effective drag must be less negative than raw" }
+    }
+
+    @Test
+    fun effectiveDrag_upwardEqualToGravity_netMovementIsStillDown() {
+        // gravity = 2.0f. Dragging up by exactly gravity: -2.0 * 0.4 = -0.8.
+        // Net per frame: 2.0 + (-0.8) = 1.2 → piece always drifts downward.
+        val gravity = 2.0f
+        val effective = effectiveVerticalDrag(-gravity, 0.4f)
+        assert(effective + gravity > 0f) { "Net per-frame movement must stay downward: effective=$effective" }
     }
 
     // -------------------------------------------------------------------------

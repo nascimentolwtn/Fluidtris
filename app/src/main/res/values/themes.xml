@@ -6,4 +6,10 @@
     </style>
 
     <style name="Theme.Fluidtris" parent="Base.Theme.Fluidtris" />
+
+    <style name="Theme.Fluidtris.Splash" parent="Theme.Fluidtris">
+        <item name="android:windowBackground">@drawable/splash_screen</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
 </resources>
