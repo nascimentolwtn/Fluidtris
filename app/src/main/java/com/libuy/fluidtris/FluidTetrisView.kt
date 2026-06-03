@@ -203,9 +203,9 @@ class FluidTetrisView @JvmOverloads constructor(
         paint.color = Color.argb(200, 80, 120, 150)  // Blue-teal button
         canvas.drawRect(10f, 100f, 280f, 200f, paint)
         paint.color = Color.argb(255, 200, 240, 230)  // Light text
-        paint.textSize = 32f
-        val soundText = if (soundEnabled) "Sound: ON" else "Sound: OFF"
-        canvas.drawText(soundText, 30f, 155f, paint)
+        paint.textSize = 48f
+        val soundText = if (soundEnabled) "🔊" else "🔇"
+        canvas.drawText(soundText, 110f, 165f, paint)
 
         // Draw the new game and pause buttons with thematic colors
         paint.color = Color.argb(200, 50, 150, 130)  // Teal button
