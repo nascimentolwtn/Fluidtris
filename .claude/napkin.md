@@ -17,8 +17,8 @@
    Do instead: when editing rendering or collision code, treat block size as `100f` constant, not grid-cell size.
 
 ## Android / Kotlin Gotchas
-1. **[2026-06-02] Rotation collision detection uses un-rotated shape**
-   Do instead: `keepPiecesInsideWalls` and wall-bound checks must call `rotatePiece()` to get the actual rotated cell offsets before clamping — the current code silently uses the wrong shape.
+1. **[2026-06-03] Use `rotatedBlockCenters()` for all pixel-space collision checks**
+   Do instead: call `rotatedBlockCenters(shape, pieceX, pieceY, pieceRotation)` to get actual screen positions of each block (mirrors the `canvas.rotate()` transform). Do NOT use `rotatePiece()` + `col * 100f` mapping — that gives wrong positions for non-axis-aligned rotations.
 
 2. **[2026-06-02] `collideWithAnotherPiece()` is dead code**
    Do instead: piece-to-piece collision locking flows through the timer path in `checkCollisions()`. Do not add calls to `collideWithAnotherPiece()` without auditing the timer logic first.
@@ -41,7 +41,7 @@
 
 ## Backlog
 1. **[refactor] God Object split — Thin View + Game Engine** — plan at `.claude/plans/plan-a-refactoring-on-nifty-avalanche.md`; splits `FluidTetrisView.kt` (723 lines) into `GameConstants`, `GameMath`, `SoundManager`, `GameEngine`, thin `FluidTetrisView`.
-2. **[bug] Rotation wall-check uses un-rotated shape** — `keepPiecesInsideWalls` doesn't account for rotated piece shape; fix requires calling `rotatePiece()` before clamping.
+2. **[bug] `keepPiecesInsideWalls` still uses logical column indices of rotated shape** — `clampPieceX` receives the result of `rotatePiece()` and uses col indices × 100f; this is an approximation that breaks at non-90° angles. Fix: switch to `rotatedBlockCenters()` for min/max X.
 3. **[bug] High score resets on app close** — `highScore` is in-memory only; persist via `SharedPreferences`.
 4. **[cleanup] `collideWithAnotherPiece()` is dead code** — audit timer logic in `checkCollisions()` before deciding to wire it up or delete it.
 5. **[feature] Spring physics wiring** — `springForceX/Y`, `springConstant`, `damping` are scaffolded but never applied; connect to movement/rotation if spring feel is desired.

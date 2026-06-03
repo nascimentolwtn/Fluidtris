@@ -530,23 +530,9 @@ class FluidTetrisView @JvmOverloads constructor(
     }
 
     private fun isPieceAtBottom(): Boolean {
-        val currentPieceShape = pieces[currentPiece]
-        val pieceSize = 100f // Size of each block
-        val gridBottom = height - 180f // Grid bottom boundary matches onDraw()
-        val cellHeight = (gridBottom - 100f) / gridRows // Calculate grid cell height (gridTop = 100f)
-
-        for (row in currentPieceShape.indices) {
-            for (col in currentPieceShape[row].indices) {
-                if (currentPieceShape[row][col] == 1) { // Only check filled blocks
-                    val blockY = pieceY + row * pieceSize
-                    // Check if any part of the piece is at or below the bottom of the grid
-                    if (blockY + pieceSize > gridBottom) {
-                        return true // Piece is at the bottom
-                    }
-                }
-            }
-        }
-        return false // Piece is not at the bottom
+        val gridBottom = height - 180f
+        return rotatedBlockCenters(pieces[currentPiece], pieceX, pieceY, pieceRotation)
+            .any { (_, by) -> by + 50f > gridBottom }
     }
 
     private fun collideAtBottom(cellWidth: Float, cellHeight: Float) {
@@ -571,28 +557,26 @@ class FluidTetrisView @JvmOverloads constructor(
     }
 
     private fun isPieceCollidingWithAnotherPiece(cellWidth: Float, cellHeight: Float): Boolean {
-        // Get the rotated shape of the current piece
-        val rotatedShape = rotatePiece(pieces[currentPiece], pieceRotation)
         val gridLeft = 150f
         val gridTop = 100f
-
-        // Check for collision with other rigid pieces
-        for (row in rotatedShape.indices) {
-            for (col in rotatedShape[row].indices) {
-                if (rotatedShape[row][col] == 1) { // Only check filled blocks
-                    val cellX = ((pieceX - gridLeft + col * 100f) / cellWidth).toInt()
-                    val cellY = ((pieceY - gridTop + row * 100f) / cellHeight).toInt()
-
-                    // Check if the piece is colliding with the grid cell
-                    if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
-                        if (grid[cellY][cellX] != null) {
-                            return true // Collision detected
-                        }
-                    }
+        val blockSize = 100f
+        for ((bx, by) in rotatedBlockCenters(pieces[currentPiece], pieceX, pieceY, pieceRotation)) {
+            // Check all four corners of the block, not just the center
+            val corners = listOf(
+                bx - blockSize / 2f to by - blockSize / 2f,
+                bx + blockSize / 2f to by - blockSize / 2f,
+                bx - blockSize / 2f to by + blockSize / 2f,
+                bx + blockSize / 2f to by + blockSize / 2f
+            )
+            for ((cx, cy) in corners) {
+                val cellX = ((cx - gridLeft) / cellWidth).toInt()
+                val cellY = ((cy - gridTop) / cellHeight).toInt()
+                if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
+                    if (grid[cellY][cellX] != null) return true
                 }
             }
         }
-        return false // No collision
+        return false
     }
 
     private fun collideWithAnotherPiece(cellWidth: Float, cellHeight: Float) {
@@ -736,8 +720,13 @@ internal fun clampPieceX(
     }
     if (minCol == Int.MAX_VALUE) return pieceX
     var x = pieceX
-    if (x + minCol * pieceSize < leftWall) x = leftWall - minCol * pieceSize
-    if (x + maxCol * pieceSize + pieceSize > rightWall) x = rightWall - maxCol * pieceSize - pieceSize
+    val padding = pieceSize * 0.25f  // Keep 1/4 block width from walls (3/4 as close as allowed)
+    // Left wall: leftmost block's left edge must be at or right of the wall + padding
+    val leftEdge = x + minCol * pieceSize
+    if (leftEdge < leftWall + padding) x = leftWall + padding - minCol * pieceSize
+    // Right wall: rightmost block's right edge must be at or left of the wall - padding
+    val rightEdge = x + (maxCol + 1) * pieceSize
+    if (rightEdge > rightWall - padding) x = rightWall - padding - (maxCol + 1) * pieceSize
     return x
 }
 
@@ -781,6 +770,37 @@ internal fun rotationDeltaFromDrag(
     val cross = vx * dy - vy * dx
     val dist2 = vx * vx + vy * vy + 1f
     return cross / dist2 * sensitivity
+}
+
+// Returns the screen-space center of each filled block after applying the canvas rotation transform.
+// Mirrors the canvas.rotate(pieceRotation, cx, cy) call in onDraw() so collision checks use actual positions.
+internal fun rotatedBlockCenters(
+    shape: List<List<Int>>,
+    pieceX: Float,
+    pieceY: Float,
+    rotation: Float,
+    pieceSize: Float = 100f
+): List<Pair<Float, Float>> {
+    val rows = shape.size
+    val cols = if (rows > 0) shape[0].size else 0
+    val cx = pieceX + cols * pieceSize / 2f
+    val cy = pieceY + rows * pieceSize / 2f
+    val angle = rotation * Math.PI / 180.0
+    val cosA = cos(angle)
+    val sinA = sin(angle)
+    val result = mutableListOf<Pair<Float, Float>>()
+    for (row in shape.indices) {
+        for (col in shape[row].indices) {
+            if (shape[row][col] != 1) continue
+            val dx = pieceX + (col + 0.5f) * pieceSize - cx
+            val dy = pieceY + (row + 0.5f) * pieceSize - cy
+            result.add(
+                (cx + dx * cosA - dy * sinA).toFloat() to
+                (cy + dx * sinA + dy * cosA).toFloat()
+            )
+        }
+    }
+    return result
 }
 
 // Rotate a tetris piece shape around its center. Handles non-square shapes correctly.
