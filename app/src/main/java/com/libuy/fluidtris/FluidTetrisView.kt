@@ -242,7 +242,8 @@ class FluidTetrisView @JvmOverloads constructor(
     ) {
         paint.isAntiAlias = true
         val jelly = 1f - solidity
-        val cornerRadius = jelly * blockSize * 0.38f + 4f
+        val inset = GameConstants.BLOCK_INSET
+        val cornerRadius = jelly * blockSize * 0.38f + 8f
         val expand = jelly * blockSize * 0.06f
         val bridgeInset = blockSize * (0.12f + solidity * 0.14f)
 
@@ -274,7 +275,7 @@ class FluidTetrisView @JvmOverloads constructor(
                 val y = startY + row * blockSize
 
                 paint.color = color
-                jellyRect.set(x - expand, y - expand, x + blockSize + expand, y + blockSize + expand)
+                jellyRect.set(x + inset - expand, y + inset - expand, x + blockSize - inset + expand, y + blockSize - inset + expand)
                 canvas.drawRoundRect(jellyRect, cornerRadius, cornerRadius, paint)
 
                 if (jelly > 0.05f) {
@@ -289,8 +290,8 @@ class FluidTetrisView @JvmOverloads constructor(
                     paint.color = Color.argb((solidity * 210).toInt(), 0, 0, 0)
                     paint.style = Paint.Style.STROKE
                     paint.strokeWidth = 2f
-                    jellyRect.set(x, y, x + blockSize, y + blockSize)
-                    canvas.drawRoundRect(jellyRect, 4f, 4f, paint)
+                    jellyRect.set(x + inset, y + inset, x + blockSize - inset, y + blockSize - inset)
+                    canvas.drawRoundRect(jellyRect, 8f, 8f, paint)
                     paint.style = Paint.Style.FILL
                 }
             }

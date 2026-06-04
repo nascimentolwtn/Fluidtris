@@ -295,21 +295,16 @@ internal class GameEngine(
         val cellHeight = (viewHeight - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
 
         val currentPieceShape = GameConstants.PIECES[currentPiece]
-        val rotatedShape = rotatePiece(currentPieceShape, pieceRotation)
 
         val step = 5f
         while (true) {
             var blocked = false
-            outer@ for (row in rotatedShape.indices) {
-                for (col in rotatedShape[row].indices) {
-                    if (rotatedShape[row][col] == 1) {
-                        val gx = ((pieceX + col * GameConstants.PIECE_SIZE + GameConstants.PIECE_SIZE / 2 - GameConstants.GRID_LEFT) / cellWidth).toInt()
-                        val gy = ((pieceY + row * GameConstants.PIECE_SIZE + GameConstants.PIECE_SIZE / 2 - GameConstants.GRID_TOP) / cellHeight).toInt()
-                        if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS && grid[gy][gx] != null) {
-                            blocked = true
-                            break@outer
-                        }
-                    }
+            for ((bx, by) in rotatedBlockCenters(currentPieceShape, pieceX, pieceY, pieceRotation)) {
+                val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
+                val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
+                if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS && grid[gy][gx] != null) {
+                    blocked = true
+                    break
                 }
             }
             if (!blocked) break
@@ -317,15 +312,11 @@ internal class GameEngine(
             if (pieceY < GameConstants.GRID_TOP) break
         }
 
-        for (row in rotatedShape.indices) {
-            for (col in rotatedShape[row].indices) {
-                if (rotatedShape[row][col] == 1) {
-                    val gridX = ((pieceX + col * GameConstants.PIECE_SIZE + GameConstants.PIECE_SIZE / 2 - GameConstants.GRID_LEFT) / cellWidth).toInt()
-                    val gridY = ((pieceY + row * GameConstants.PIECE_SIZE + GameConstants.PIECE_SIZE / 2 - GameConstants.GRID_TOP) / cellHeight).toInt()
-                    if (gridX in 0 until GameConstants.GRID_COLUMNS && gridY in 0 until GameConstants.GRID_ROWS) {
-                        grid[gridY][gridX] = currentPieceColor
-                    }
-                }
+        for ((bx, by) in rotatedBlockCenters(currentPieceShape, pieceX, pieceY, pieceRotation)) {
+            val gridX = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
+            val gridY = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
+            if (gridX in 0 until GameConstants.GRID_COLUMNS && gridY in 0 until GameConstants.GRID_ROWS) {
+                grid[gridY][gridX] = currentPieceColor
             }
         }
 
@@ -416,19 +407,21 @@ internal class GameEngine(
 
     private fun countContactBlocksAtBottom(viewHeight: Int): Int {
         val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
+        val halfBlock = GameConstants.PIECE_SIZE / 2 - GameConstants.BLOCK_INSET
         return rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
-            .count { (_, by) -> by + GameConstants.PIECE_SIZE / 2 > gridBottom }
+            .count { (_, by) -> by + halfBlock > gridBottom }
     }
 
     private fun countContactBlocksWithPiece(cellWidth: Float, cellHeight: Float): Int {
         val blockSize = GameConstants.PIECE_SIZE
+        val h = blockSize / 2f - GameConstants.BLOCK_INSET
         return rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
             .count { (bx, by) ->
                 listOf(
-                    bx - blockSize / 2f to by - blockSize / 2f,
-                    bx + blockSize / 2f to by - blockSize / 2f,
-                    bx - blockSize / 2f to by + blockSize / 2f,
-                    bx + blockSize / 2f to by + blockSize / 2f
+                    bx - h to by - h,
+                    bx + h to by - h,
+                    bx - h to by + h,
+                    bx + h to by + h
                 ).any { (cx, cy) ->
                     val cellX = ((cx - GameConstants.GRID_LEFT) / cellWidth).toInt()
                     val cellY = ((cy - GameConstants.GRID_TOP) / cellHeight).toInt()
@@ -444,10 +437,11 @@ internal class GameEngine(
         val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
         val centers = rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
 
+        val h = blockSize / 2f - GameConstants.BLOCK_INSET
         val contactXs = mutableListOf<Float>()
         // Bottom-wall contacts: use the falling block's own center X
         centers.forEach { (bx, by) ->
-            if (by + blockSize / 2f > gridBottom) contactXs.add(bx)
+            if (by + h > gridBottom) contactXs.add(bx)
         }
         // Piece-to-piece contacts: use the placed block's center X so that direction
         // is determined by where the obstacle actually is, not which side of the falling
@@ -455,10 +449,10 @@ internal class GameEngine(
         val hitCells = mutableSetOf<Pair<Int, Int>>()
         centers.forEach { (bx, by) ->
             listOf(
-                bx - blockSize / 2f to by - blockSize / 2f,
-                bx + blockSize / 2f to by - blockSize / 2f,
-                bx - blockSize / 2f to by + blockSize / 2f,
-                bx + blockSize / 2f to by + blockSize / 2f
+                bx - h to by - h,
+                bx + h to by - h,
+                bx - h to by + h,
+                bx + h to by + h
             ).forEach { (cx, cy) ->
                 val cellX = ((cx - GameConstants.GRID_LEFT) / cellWidth).toInt()
                 val cellY = ((cy - GameConstants.GRID_TOP) / cellHeight).toInt()
