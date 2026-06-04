@@ -34,7 +34,8 @@ class GameEngineCollisionTest {
     @Test
     fun pieceJustAboveBottom_false() {
         val e = engine()
-        // pieceY = 1639: center at 1689, + 50 = 1739 < 1740
+        e.currentPiece = 0  // I-piece (1 row): bottom center = pieceY + 50; 1639+50+50=1739 < 1740
+        e.pieceRotation = 0f
         e.pieceY = 1639f
         assertFalse(e.isPieceAtBottom(VH))
     }

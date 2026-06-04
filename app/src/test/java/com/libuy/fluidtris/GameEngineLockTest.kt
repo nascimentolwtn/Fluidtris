@@ -26,8 +26,9 @@ class GameEngineLockTest {
     @Test
     fun lockAtBottom_blocksWrittenToGrid() {
         val e = engine()
+        e.currentPiece = 0  // I-piece: row 0, cols 3-6 at default spawn position
+        e.pieceRotation = 0f
         e.lockPieceAtBottom(VW, VH)
-        // I-piece occupies grid row 0, cols 3-6
         assertNotNull(e.grid[0][3])
         assertNotNull(e.grid[0][4])
         assertNotNull(e.grid[0][5])
@@ -46,19 +47,23 @@ class GameEngineLockTest {
     @Test
     fun turnPieceRigid_nextPieceSpawned() {
         val e = engine()
-        assertEquals(0, e.currentPiece)   // I-piece
-        assertEquals(1, e.nextPiece)      // O-piece up next
+        e.currentPiece = 0
+        e.pieceRotation = 0f
+        val savedNext = e.nextPiece
         e.turnPieceRigid(VW, VH)
-        assertEquals(1, e.currentPiece)   // now O-piece is falling
-        assertEquals(2, e.nextPiece)      // T-piece queued
+        assertEquals(savedNext, e.currentPiece)
+        assertTrue(e.nextPiece in 0 until GameConstants.PIECES.size)
     }
 
     @Test
     fun turnPieceRigid_pieceResetToTop() {
         val e = engine()
+        e.currentPiece = 0
+        e.pieceRotation = 0f
+        val savedNextRotation = e.nextPieceRotation
         e.turnPieceRigid(VW, VH)
         assertEquals(GameConstants.GRID_TOP, e.pieceY, 0.001f)
-        assertEquals(0f, e.pieceRotation, 0.001f)
+        assertEquals(savedNextRotation, e.pieceRotation, 0.001f)
     }
 
     @Test
@@ -73,6 +78,7 @@ class GameEngineLockTest {
     @Test
     fun turnPieceRigid_rotationSnaps() {
         val e = engine()
+        e.currentPiece = 0  // I-piece required for col assertions below
         // 91° rounds to 90° (Math.round(91/90) = 1).
         // At 90° the I-piece occupies a single column (col 3), not four columns.
         e.pieceRotation = 91f
