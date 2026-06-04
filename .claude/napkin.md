@@ -42,9 +42,10 @@
 ## Backlog
 1. **[feature] Ask player name when hitting new highscore** — show Android `AlertDialog` with `EditText` when `onHighScoreBeat` fires in FluidTetrisView; save name alongside score in SharedPreferences via new `HighScoreManager.saveHighScoreName()` method.
 2. **[feature] Spring physics wiring** — deleted in refactor as dead code; re-add to `GameEngine` fields if spring feel is desired.
-3  **[bug] Fix: piece overwrites another piece when locked with rotation.**
+3. **[bug] Fix: piece overwrites another piece when locked with rotation.**
 
 ## Done
+- **[2026-06-04] Feature: tiered line-clear scoring** — 1 line = 100pts, 2 lines = 300pts, 3 lines = 500pts, 4 lines = 800pts. Changed `checkLines()` in `GameEngine.kt` from `score += linesCleared * 100` to `when` statement with tiered bonuses. Updated 2 unit tests and added 2 new tests (`threeFullRows_score500`, `fourFullRows_score800`). All 85 tests pass.
 - **[2026-06-04] Polish: fluid pieces 4px smaller with centered draw offset** — `fluidBlockSize = PIECE_SIZE - (1f - solidity) * 4f`; draw offset keeps visual center at rotation pivot; corner radius grows proportionally, giving rounder look when fluid. No logic/collision changes.
 - **[2026-06-04] Fix: HighScore not persisting across restarts** — `engine.highScore` was never seeded from SharedPreferences on startup. Added `engine.highScore = highScoreManager.loadHighScore()` in `FluidTetrisView.init`. Save path via `onHighScoreBeat` was already correct.
 - **[2026-06-03] Test campaign Phase 2 — GameEngine tests** — `GameEngineLineTest` (6), `GameEngineCollisionTest` (8), `GameEngineLockTest` (6), `GameEngineStateTest` (9). Bug found and fixed: `checkLines()` `for` loop skipped consecutive full rows; replaced with `while` that re-checks same index after each clear. All 85 unit tests pass.

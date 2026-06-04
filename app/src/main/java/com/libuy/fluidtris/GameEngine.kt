@@ -284,7 +284,14 @@ internal class GameEngine(
             }
         }
         if (linesCleared > 0) {
-            score += linesCleared * 100
+            val points = when (linesCleared) {
+                1 -> 100
+                2 -> 300
+                3 -> 500
+                4 -> 800
+                else -> linesCleared * 100
+            }
+            score += points
             if (score > highScore) {
                 highScore = score
                 onHighScoreBeat(score)

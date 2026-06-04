@@ -56,12 +56,12 @@ class GameEngineLineTest {
     }
 
     @Test
-    fun twoFullRows_score200() {
+    fun twoFullRows_score300() {
         val e = engine()
         for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[18][j] = Color.RED
         for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[19][j] = Color.RED
         e.checkLines()
-        assertEquals(200, e.score)
+        assertEquals(300, e.score)
         for (j in 0 until GameConstants.GRID_COLUMNS) {
             assertNull(e.grid[18][j])
             assertNull(e.grid[19][j])
@@ -75,9 +75,41 @@ class GameEngineLineTest {
         for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[18][j] = Color.RED
         for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[19][j] = Color.RED
         e.checkLines()
-        assertEquals(200, e.score)
+        assertEquals(300, e.score)
         assertNull(e.grid[17][3])
         assertNull(e.grid[18][3])
         assertEquals(Color.GREEN, e.grid[19][3])
+    }
+
+    @Test
+    fun threeFullRows_score500() {
+        val e = engine()
+        for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[17][j] = Color.RED
+        for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[18][j] = Color.RED
+        for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[19][j] = Color.RED
+        e.checkLines()
+        assertEquals(500, e.score)
+        for (j in 0 until GameConstants.GRID_COLUMNS) {
+            assertNull(e.grid[17][j])
+            assertNull(e.grid[18][j])
+            assertNull(e.grid[19][j])
+        }
+    }
+
+    @Test
+    fun fourFullRows_score800() {
+        val e = engine()
+        for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[16][j] = Color.RED
+        for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[17][j] = Color.RED
+        for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[18][j] = Color.RED
+        for (j in 0 until GameConstants.GRID_COLUMNS) e.grid[19][j] = Color.RED
+        e.checkLines()
+        assertEquals(800, e.score)
+        for (j in 0 until GameConstants.GRID_COLUMNS) {
+            assertNull(e.grid[16][j])
+            assertNull(e.grid[17][j])
+            assertNull(e.grid[18][j])
+            assertNull(e.grid[19][j])
+        }
     }
 }
