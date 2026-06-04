@@ -41,9 +41,9 @@
 
 ## Backlog
 1. **[feature] Ask player name when hitting new highscore** — show Android `AlertDialog` with `EditText` when `onHighScoreBeat` fires in FluidTetrisView; save name alongside score in SharedPreferences via new `HighScoreManager.saveHighScoreName()` method.
-2. **[bug] Fix: piece overwrites another piece when locked with rotation.**
 
 ## Done
+- **[2026-06-04] Fix: piece overwrites another piece when locked with rotation** — two bugs: (1) `doesPieceCollideWithGridAtY` ignored actual `by` from `rotatedBlockCenters`, using `testY+50f` for all blocks; (2) `turnPieceRigid` snaps rotation before writing to grid but never re-checked for overlap in the snapped shape. Fix: corrected `doesPieceCollideWithGridAtY` to use real `by`, added post-snap overlap-clearing loop in `turnPieceRigid` using the same coord formula as the grid write. 1 regression test added. 86 tests pass.
 - **[2026-06-04] Feature: Spring physics wiring** — `springForceX` added to `GameEngine`; set from horizontal drag delta × `SPRING_CARRY=0.5`, decays each frame × `SPRING_DAMPING=0.80`. Piece slides horizontally after drag release; zeroed on touch-down, lock-timer start, and piece spawn. Build clean.
 - **[2026-06-04] Feature: tiered line-clear scoring** — 1 line = 100pts, 2 lines = 300pts, 3 lines = 500pts, 4 lines = 800pts. Changed `checkLines()` in `GameEngine.kt` from `score += linesCleared * 100` to `when` statement with tiered bonuses. Updated 2 unit tests and added 2 new tests (`threeFullRows_score500`, `fourFullRows_score800`). All 85 tests pass.
 - **[2026-06-04] Polish: fluid pieces 4px smaller with centered draw offset** — `fluidBlockSize = PIECE_SIZE - (1f - solidity) * 4f`; draw offset keeps visual center at rotation pivot; corner radius grows proportionally, giving rounder look when fluid. No logic/collision changes.

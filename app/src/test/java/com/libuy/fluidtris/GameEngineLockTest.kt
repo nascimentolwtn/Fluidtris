@@ -1,5 +1,6 @@
 package com.libuy.fluidtris
 
+import android.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -73,6 +74,21 @@ class GameEngineLockTest {
         // line not cleared → grid[0].any { != null } = true → isGameOver
         e.turnPieceRigid(VW, VH)
         assertTrue(e.isGameOver)
+    }
+
+    @Test
+    fun turnPieceRigid_doesNotOverwritePlacedBlockOnRotationSnap() {
+        val e = engine()
+        e.currentPiece = 0  // I-piece: rotatePiece at 90° gives [[1],[1],[1],[1]]
+        e.pieceRotation = 91f  // snaps to 90°
+        e.pieceX = 490f
+        e.pieceY = 900f
+        // At 90° + pieceX=490 + pieceY=900:
+        //   row 0, col 0 → gridX=(490+50-150)/cellW≈3, gridY=(900+50-100)/cellH≈10
+        val sentinel = Color.RED
+        e.grid[10][3] = sentinel
+        e.turnPieceRigid(VW, VH)
+        assertEquals("grid[10][3] must not be overwritten", sentinel, e.grid[10][3])
     }
 
     @Test

@@ -297,6 +297,26 @@ internal class GameEngine(
         val currentPieceShape = GameConstants.PIECES[currentPiece]
         val rotatedShape = rotatePiece(currentPieceShape, pieceRotation)
 
+        val step = 5f
+        while (true) {
+            var blocked = false
+            outer@ for (row in rotatedShape.indices) {
+                for (col in rotatedShape[row].indices) {
+                    if (rotatedShape[row][col] == 1) {
+                        val gx = ((pieceX + col * GameConstants.PIECE_SIZE + GameConstants.PIECE_SIZE / 2 - GameConstants.GRID_LEFT) / cellWidth).toInt()
+                        val gy = ((pieceY + row * GameConstants.PIECE_SIZE + GameConstants.PIECE_SIZE / 2 - GameConstants.GRID_TOP) / cellHeight).toInt()
+                        if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS && grid[gy][gx] != null) {
+                            blocked = true
+                            break@outer
+                        }
+                    }
+                }
+            }
+            if (!blocked) break
+            pieceY -= step
+            if (pieceY < GameConstants.GRID_TOP) break
+        }
+
         for (row in rotatedShape.indices) {
             for (col in rotatedShape[row].indices) {
                 if (rotatedShape[row][col] == 1) {
@@ -479,9 +499,7 @@ internal class GameEngine(
     private fun doesPieceCollideWithGridAtY(testY: Float, cellWidth: Float, cellHeight: Float): Boolean {
         val blockSize = GameConstants.PIECE_SIZE
 
-        for ((bx, _) in rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, testY, pieceRotation)) {
-            val by = testY + blockSize / 2f
-
+        for ((bx, by) in rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, testY, pieceRotation)) {
             val corners = listOf(
                 bx - blockSize / 2f to by - blockSize / 2f,
                 bx + blockSize / 2f to by - blockSize / 2f,
