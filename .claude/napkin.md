@@ -40,12 +40,12 @@
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
 ## Backlog
-1. **[bug] High score resets on app close** — `engine.highScore` is in-memory only; persist via `SharedPreferences`.
-2. **[feature] Spring physics wiring** — deleted in refactor as dead code; re-add to `GameEngine` fields if spring feel is desired.
+1. **[polish] Fluid pieces more rounded, 3–5px smaller** — reduce piece block size while dragging (fluid state); keep solid piece size same; keep animation smooth. Makes pieces easier to fit in tight spaces.
+2. **[bug] High score resets on app close** — `engine.highScore` is in-memory only; persist via `SharedPreferences`.
+3. **[feature] Spring physics wiring** — deleted in refactor as dead code; re-add to `GameEngine` fields if spring feel is desired.
 
-## Done  
-- **[2026-06-03] Test campaign Phase 2 — GameEngine tests** — `GameEngineLineTest` (6 tests), `GameEngineCollisionTest` (8 tests), `GameEngineLockTest` (6 tests), `GameEngineStateTest` (9 tests). Total 29 unit tests pass. All 4 public methods on `GameEngine` have happy-path + edge-case coverage.
-- **[2026-06-03] Refactor: God Object split** — `FluidTetrisView.kt` (750+ lines) split into `GameConstants.kt`, `GameMath.kt`, `SoundManager.kt`, `GameEngine.kt`, thin `FluidTetrisView.kt`. Dead code (`collideWithAnotherPiece`, spring fields) deleted. All 24 unit tests pass; `assembleDebug` clean.
-- **[2026-06-03] Cleanup: `collideWithAnotherPiece()` dead code removed** — Audited timer logic: `checkCollisions()` + `update()` uses 3-second timers for bottom/piece collisions, then calls `turnPieceRigid()`. The old `collideWithAnotherPiece()` function (which directly placed pieces) was never called and is now deleted.
-- **[2026-06-03] Fix: rotated pieces can't reach left wall** — `keepPiecesInsideWalls()` was using logical `rotatePiece()` shape for clamping, but rendering uses `canvas.rotate()` around the original bounding box center. Fixed by switching to `clampPieceXByCenters()` with `rotatedBlockCenters()`. 4 regression tests added to `WallClampTest.kt`. Total 28 unit tests pass.
-- **[2026-06-03] Test campaign Phase 1** — `RotatePieceTest.kt` added (11 tests for `rotatePiece` on I/T/O pieces, full shape equality); duplicate `rotatePiece` definition was already removed. All 24 unit tests pass.
+## Done
+- **[2026-06-03] Test campaign Phase 2 — GameEngine tests** — `GameEngineLineTest` (6), `GameEngineCollisionTest` (8), `GameEngineLockTest` (6), `GameEngineStateTest` (9). Bug found and fixed: `checkLines()` `for` loop skipped consecutive full rows; replaced with `while` that re-checks same index after each clear. All 85 unit tests pass.
+- **[2026-06-03] Refactor: God Object split** — `FluidTetrisView.kt` (750+ lines) split into `GameConstants.kt`, `GameMath.kt`, `SoundManager.kt`, `GameEngine.kt`, thin `FluidTetrisView.kt`. Dead code (`collideWithAnotherPiece`, spring fields) deleted. `assembleDebug` clean.
+- **[2026-06-03] Fix: rotated pieces can't reach left wall** — switched `keepPiecesInsideWalls()` to `clampPieceXByCenters()` with `rotatedBlockCenters()`. 4 regression tests added to `WallClampTest.kt`.
+- **[2026-06-03] Test campaign Phase 1** — `RotatePieceTest.kt` added (11 tests for `rotatePiece` on I/T/O pieces).

@@ -8,15 +8,11 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
-import kotlin.math.cos
-import kotlin.math.floor
-import kotlin.math.sin
 
 class FluidTetrisView @JvmOverloads constructor(
     context: Context,
@@ -24,156 +20,80 @@ class FluidTetrisView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val paint = Paint().apply {
-        style = Paint.Style.FILL
-    }
+    private val paint = Paint().apply { style = Paint.Style.FILL }
     private val jellyRect = RectF()
-
     private val backgroundBitmap: Bitmap =
         BitmapFactory.decodeResource(resources, R.drawable.game_background)
 
-    private var pieceX = 0f
-    private var pieceY = 0f
-    private var pieceRotation = 0f
-    private var isDragging = false
-    private var isDraggingCenter = false
-    private var touchedBlockRow = 0
-    private var touchedBlockCol = 0
-    private var lastTouchX = 0f
-    private var lastTouchY = 0f
-
-    // Spring simulation variables
-    private var springForceX = 0f
-    private var springForceY = 0f
-    private val springConstant = 0.2f
-    private val damping = 0.9f
-
-    // Gravity effect
-    private val gravity = 2.0f  // px/frame; at 60 fps a piece takes ~16 s to cross the grid
-    private var velocityY = 0f
-    private val upwardDragFactor = 0.4f   // how much upward drag counteracts gravity
-    private val rotationSensitivity = 30f // degrees per unit of torque
-
-    // Game grid: 7 columns by 20 lines
-    private val gridColumns = 7
-    private val gridRows = 20
-    private val grid = Array(gridRows) { Array<Int?>(gridColumns) { null } }
-    private var score = 0
-    private var highScore = 0
-
-    // Tetris pieces
-    private val pieces = listOf(
-        listOf(listOf(1, 1, 1, 1)), // I
-        listOf(listOf(1, 1), listOf(1, 1)), // O
-        listOf(listOf(1, 1, 1), listOf(0, 1, 0)), // T
-        listOf(listOf(1, 1, 1), listOf(1, 0, 0)), // L
-        listOf(listOf(1, 1, 1), listOf(0, 0, 1)), // J
-        listOf(listOf(1, 1, 0), listOf(0, 1, 1)), // S
-        listOf(listOf(0, 1, 1), listOf(1, 1, 0))  // Z
+    private val soundManager = SoundManager(context)
+    private val engine = GameEngine(
+        onPieceLocked = { soundManager.playRigid() },
+        onLineCleared = { soundManager.playMove() }
     )
 
-    private val pieceColors = listOf(
-        Color.CYAN, // I
-        Color.YELLOW, // O
-        Color.MAGENTA, // T
-        Color.RED, // L
-        Color.BLUE, // J
-        Color.GREEN, // S
-        Color.RED // Z
-    )
-
-    // (row, col) pairs in the canonical shape that trigger movement; all other blocks trigger rotation
-    private val pieceCenterCells: List<Set<Pair<Int, Int>>> = listOf(
-        setOf(0 to 1, 0 to 2),                         // I – both middle blocks
-        setOf(0 to 0, 0 to 1, 1 to 0, 1 to 1),         // O – whole piece is movement zone
-        setOf(0 to 1),                                  // T – middle of top bar
-        setOf(0 to 1),                                  // L – middle of long bar
-        setOf(0 to 1),                                  // J – middle of long bar
-        setOf(0 to 1),                                  // S – top middle block
-        setOf(0 to 1),                                  // Z – top middle block
-    )
-
-    private var currentPiece = 0
-    private var currentPieceColor = pieceColors[0]
-    private var nextPiece = 1
-    private var nextPieceColor = pieceColors[1]
-
-
-    // Game state
-    private var isPaused = false
-    private var isGameOver = false
-    private var wasManuallyPausedBeforeSystemPause = false
-    private var soundEnabled = true
-
-    // Game loop
     private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {
         override fun run() {
-            update()
-            handler.postDelayed(this, 16) // 60 FPS
+            engine.update(width, height)
+            invalidate()
+            handler.postDelayed(this, GameConstants.GAME_LOOP_INTERVAL_MS)
         }
     }
 
-    // Add new variables to track collision times
-    private var bottomCollisionTime = 0L
-    private var pieceCollisionTime = 0L
-    private var isWaitingToTurnRigidAtBottom = false
-    private var isWaitingToTurnRigidAtPiece = false
-
     init {
-        // Initialize game state
-        resetGame()
-        // Start the game loop
         handler.post(updateRunnable)
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldW: Int, oldH: Int) {
+        super.onSizeChanged(w, h, oldW, oldH)
+        engine.resetGame(w, h)
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        // Draw background
         canvas.drawBitmap(backgroundBitmap, null,
             RectF(0f, 0f, width.toFloat(), height.toFloat()), null)
 
-        // Define grid area (centered within the "glass" dark area of the background)
-        val gridLeft = 150f
-        val gridTop = 100f
-        val gridRight = width - 150f
-        val gridBottom = height - 180f
-        val cellWidth = (gridRight - gridLeft) / gridColumns
-        val cellHeight = (gridBottom - gridTop) / gridRows
+        val gridLeft = GameConstants.GRID_LEFT
+        val gridTop = GameConstants.GRID_TOP
+        val gridRight = width - GameConstants.GRID_RIGHT_MARGIN
+        val gridBottom = height - GameConstants.GRID_BOTTOM_MARGIN
+        val cellWidth = (gridRight - gridLeft) / GameConstants.GRID_COLUMNS
+        val cellHeight = (gridBottom - gridTop) / GameConstants.GRID_ROWS
 
-        // Draw grid border
         paint.color = Color.BLACK
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2f
         canvas.drawRect(gridLeft, gridTop, gridRight, gridBottom, paint)
         paint.style = Paint.Style.FILL
 
-        // Draw the grid
-        for (i in 0 until gridRows) {
-            for (j in 0 until gridColumns) {
-                grid[i][j]?.let { color ->
+        for (i in 0 until GameConstants.GRID_ROWS) {
+            for (j in 0 until GameConstants.GRID_COLUMNS) {
+                engine.grid[i][j]?.let { color ->
                     paint.color = color
-                    canvas.drawRect(gridLeft + j * cellWidth, gridTop + i * cellHeight, gridLeft + (j + 1) * cellWidth, gridTop + (i + 1) * cellHeight, paint)
-                    // Draw border
+                    canvas.drawRect(gridLeft + j * cellWidth, gridTop + i * cellHeight,
+                        gridLeft + (j + 1) * cellWidth, gridTop + (i + 1) * cellHeight, paint)
                     paint.color = Color.BLACK
                     paint.style = Paint.Style.STROKE
                     paint.strokeWidth = 2f
-                    canvas.drawRect(gridLeft + j * cellWidth, gridTop + i * cellHeight, gridLeft + (j + 1) * cellWidth, gridTop + (i + 1) * cellHeight, paint)
+                    canvas.drawRect(gridLeft + j * cellWidth, gridTop + i * cellHeight,
+                        gridLeft + (j + 1) * cellWidth, gridTop + (i + 1) * cellHeight, paint)
                     paint.style = Paint.Style.FILL
                 }
             }
         }
 
-        // Draw the current piece
-        val currentPieceShape = pieces[currentPiece]
-        val pieceSize = 100f
+        val currentPieceShape = GameConstants.PIECES[engine.currentPiece]
+        val pieceSize = GameConstants.PIECE_SIZE
         canvas.save()
-        canvas.rotate(pieceRotation, pieceX + (currentPieceShape[0].size * pieceSize) / 2, pieceY + (currentPieceShape.size * pieceSize) / 2)
-        drawJellyPiece(canvas, currentPieceShape, pieceX, pieceY, currentPieceColor, getCollisionSolidity())
+        canvas.rotate(engine.pieceRotation,
+            engine.pieceX + (currentPieceShape[0].size * pieceSize) / 2,
+            engine.pieceY + (currentPieceShape.size * pieceSize) / 2)
+        drawJellyPiece(canvas, currentPieceShape, engine.pieceX, engine.pieceY,
+            engine.currentPieceColor, engine.getCollisionSolidity())
         canvas.restore()
 
-        // Draw the next piece preview
         val previewX = width - 200f
         val previewY = 50f
         val previewPath = Path()
@@ -182,159 +102,82 @@ class FluidTetrisView @JvmOverloads constructor(
         previewPath.lineTo(previewX + pieceSize, previewY + pieceSize)
         previewPath.lineTo(previewX, previewY + pieceSize)
         previewPath.close()
-        paint.color = nextPieceColor
+        paint.color = engine.nextPieceColor
         canvas.drawPath(previewPath, paint)
-        // Draw border
         paint.color = Color.BLACK
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2f
         canvas.drawPath(previewPath, paint)
         paint.style = Paint.Style.FILL
 
-        // Draw the score and high score with semi-transparent background
-        paint.color = Color.argb(180, 20, 60, 100)  // Dark teal overlay
+        paint.color = Color.argb(180, 20, 60, 100)
         canvas.drawRect(10f, 5f, 400f, 95f, paint)
-        paint.color = Color.argb(255, 100, 220, 200)  // Cyan-teal text
+        paint.color = Color.argb(255, 100, 220, 200)
         paint.textSize = 40f
-        canvas.drawText("Score: $score", 20f, 40f, paint)
-        canvas.drawText("High Score: $highScore", 20f, 80f, paint)
+        canvas.drawText("Score: ${engine.score}", 20f, 40f, paint)
+        canvas.drawText("High Score: ${engine.highScore}", 20f, 80f, paint)
 
-        // Draw the sound toggle button
-        paint.color = Color.argb(200, 80, 120, 150)  // Blue-teal button
+        paint.color = Color.argb(200, 80, 120, 150)
         canvas.drawRect(10f, 100f, 280f, 200f, paint)
-        paint.color = Color.argb(255, 200, 240, 230)  // Light text
+        paint.color = Color.argb(255, 200, 240, 230)
         paint.textSize = 48f
-        val soundText = if (soundEnabled) "🔊" else "🔇"
+        val soundText = if (soundManager.enabled) "🔊" else "🔇"
         canvas.drawText(soundText, 110f, 165f, paint)
 
-        // Draw the new game and pause buttons with thematic colors
-        paint.color = Color.argb(200, 50, 150, 130)  // Teal button
+        paint.color = Color.argb(200, 50, 150, 130)
         canvas.drawRect(20f, height - 150f, 200f, height - 50f, paint)
-        paint.color = Color.argb(255, 200, 240, 230)  // Light text
+        paint.color = Color.argb(255, 200, 240, 230)
         paint.textSize = 30f
         canvas.drawText("New Game", 35f, height - 100f, paint)
 
-        paint.color = Color.argb(200, 100, 150, 180)  // Blue button
+        paint.color = Color.argb(200, 100, 150, 180)
         canvas.drawRect(width - 200f, height - 150f, width - 20f, height - 50f, paint)
-        paint.color = Color.argb(255, 200, 240, 230)  // Light text
+        paint.color = Color.argb(255, 200, 240, 230)
         canvas.drawText("Pause", width - 160f, height - 100f, paint)
 
-        // Draw game over screen if game is over
-        if (isGameOver) {
-            // Semi-transparent overlay
+        if (engine.isGameOver) {
             paint.color = Color.argb(150, 20, 40, 80)
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-
-            paint.color = Color.argb(255, 150, 200, 220)  // Light blue text
+            paint.color = Color.argb(255, 150, 200, 220)
             paint.textSize = 80f
             canvas.drawText("Game Over", width / 2 - 250f, height / 2 - 50f, paint)
             paint.textSize = 60f
             paint.color = Color.argb(255, 120, 200, 220)
-            canvas.drawText("High Score: $highScore", width / 2 - 250f, height / 2 + 80f, paint)
+            canvas.drawText("High Score: ${engine.highScore}", width / 2 - 250f, height / 2 + 80f, paint)
         }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                val hitCell = getHitCell(event.x, event.y)
-                if (!isPaused && hitCell != null) {
-                    isDragging = true
-                    isDraggingCenter = (hitCell in pieceCenterCells[currentPiece])
-                    touchedBlockRow = hitCell.first
-                    touchedBlockCol = hitCell.second
-                    lastTouchX = event.x
-                    lastTouchY = event.y
+                if (!engine.isPaused && engine.onTouchDown(event.x, event.y)) {
                     return true
                 }
-                // Check if the sound toggle button is pressed
                 if (event.x in 10f..280f && event.y in 100f..200f) {
-                    soundEnabled = !soundEnabled
+                    soundManager.enabled = !soundManager.enabled
                     invalidate()
                     return true
                 }
-                // Check if the new game button is pressed
                 if (event.x in 20f..200f && event.y in (height - 150f)..(height - 50f)) {
-                    resetGame()
+                    engine.resetGame(width, height)
+                    invalidate()
                     return true
                 }
-                // Check if the pause button is pressed
                 if (event.x in (width - 200f)..(width - 20f) && event.y in (height - 150f)..(height - 50f)) {
-                    isPaused = !isPaused
+                    engine.isPaused = !engine.isPaused
                     return true
                 }
             }
             MotionEvent.ACTION_MOVE -> {
-                if (isDragging) {
-                    val dx = event.x - lastTouchX
-                    val dy = event.y - lastTouchY
-                    var appliedDx = 0f
-                    var appliedDy = 0f
-                    val prevRotation = pieceRotation
-
-                    if (isDraggingCenter) {
-                        appliedDx = dx
-                        appliedDy = effectiveVerticalDrag(dy, upwardDragFactor)
-                        pieceX += appliedDx
-                        pieceY += appliedDy
-                        keepPiecesInsideWalls()
-                    } else {
-                        // Torque-based rotation: cross product of (block→center) with drag vector
-                        val shape = pieces[currentPiece]
-                        val pieceSize = 100f
-                        val rcx = pieceX + shape[0].size * pieceSize / 2f
-                        val rcy = pieceY + shape.size * pieceSize / 2f
-                        val angle = pieceRotation * Math.PI / 180.0
-                        val cosA = cos(angle)
-                        val sinA = sin(angle)
-                        val bux = pieceX + (touchedBlockCol + 0.5f) * pieceSize
-                        val buy = pieceY + (touchedBlockRow + 0.5f) * pieceSize
-                        val bdx = (bux - rcx).toDouble()
-                        val bdy = (buy - rcy).toDouble()
-                        val bx = (rcx + bdx * cosA - bdy * sinA).toFloat()
-                        val by = (rcy + bdx * sinA + bdy * cosA).toFloat()
-                        val vx = rcx - bx
-                        val vy = rcy - by
-                        pieceRotation -= rotationDeltaFromDrag(vx, vy, dx, dy, rotationSensitivity)
-                        // Also translate while rotating
-                        appliedDx = dx
-                        appliedDy = effectiveVerticalDrag(dy, upwardDragFactor)
-                        pieceX += appliedDx
-                        pieceY += appliedDy
-                        keepPiecesInsideWalls()
-                    }
-
-                    lastTouchX = event.x
-                    lastTouchY = event.y
-
-                    // Check for collision and update grid
-                    val cellWidth = (width - 300f) / gridColumns
-                    val cellHeight = (height - 280f) / gridRows
-                    val gridLeft = 150f
-                    val gridTop = 100f
-                    val cellX = ((pieceX - gridLeft) / cellWidth).toInt()
-                    val cellY = ((pieceY - gridTop) / cellHeight).toInt()
-                    if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
-
-                        if (isPieceAtBottom()) {
-                            isDragging = false
-                            collideAtBottom(cellWidth, cellHeight)
-                        }
-
-                        if (isPieceCollidingWithAnotherPiece(cellWidth, cellHeight)) {
-                            pieceX -= appliedDx
-                            pieceY -= appliedDy
-                            pieceRotation = prevRotation
-                            isDragging = false
-                        }
-                    }
+                if (engine.isDragging) {
+                    engine.onTouchMove(event.x, event.y, width, height)
                     invalidate()
                     return true
                 }
             }
             MotionEvent.ACTION_UP -> {
-                if (!isPaused && isDragging) {
-                    isDragging = false
+                if (!engine.isPaused) {
+                    engine.onTouchUp()
                 }
                 return true
             }
@@ -345,23 +188,11 @@ class FluidTetrisView @JvmOverloads constructor(
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         if (!hasWindowFocus) {
-            wasManuallyPausedBeforeSystemPause = isPaused
-            isPaused = true
+            engine.wasManuallyPausedBeforeSystemPause = engine.isPaused
+            engine.isPaused = true
         } else {
-            isPaused = wasManuallyPausedBeforeSystemPause
+            engine.isPaused = engine.wasManuallyPausedBeforeSystemPause
         }
-    }
-
-    private fun getCollisionSolidity(): Float {
-        val elapsed = when {
-            isWaitingToTurnRigidAtBottom -> System.currentTimeMillis() - bottomCollisionTime
-            isWaitingToTurnRigidAtPiece -> System.currentTimeMillis() - pieceCollisionTime
-            else -> return 0f
-        }
-        val t = (elapsed / 3000f).coerceIn(0f, 1f)
-        // Oscillate with sin that trends toward solid (1.0) as t → 1
-        val oscillation = sin(t * Math.PI * 6.0).toFloat()
-        return (t + oscillation * (1f - t) * 0.6f).coerceIn(0f, 1f)
     }
 
     private fun drawJellyPiece(
@@ -378,24 +209,24 @@ class FluidTetrisView @JvmOverloads constructor(
         paint.color = color
         paint.style = Paint.Style.FILL
 
-        // Bridges fill concave gaps between rounded adjacent blocks
         for (row in shape.indices) {
             for (col in shape[row].indices) {
                 if (shape[row][col] != 1) continue
                 val x = startX + col * blockSize
                 val y = startY + row * blockSize
                 if (col + 1 < shape[row].size && shape[row][col + 1] == 1) {
-                    jellyRect.set(x + blockSize * 0.4f, y + bridgeInset, x + blockSize * 1.6f, y + blockSize - bridgeInset)
+                    jellyRect.set(x + blockSize * 0.4f, y + bridgeInset,
+                        x + blockSize * 1.6f, y + blockSize - bridgeInset)
                     canvas.drawRoundRect(jellyRect, cornerRadius * 0.4f, cornerRadius * 0.4f, paint)
                 }
                 if (row + 1 < shape.size && shape[row + 1][col] == 1) {
-                    jellyRect.set(x + bridgeInset, y + blockSize * 0.4f, x + blockSize - bridgeInset, y + blockSize * 1.6f)
+                    jellyRect.set(x + bridgeInset, y + blockSize * 0.4f,
+                        x + blockSize - bridgeInset, y + blockSize * 1.6f)
                     canvas.drawRoundRect(jellyRect, cornerRadius * 0.4f, cornerRadius * 0.4f, paint)
                 }
             }
         }
 
-        // Blocks drawn on top of bridges
         for (row in shape.indices) {
             for (col in shape[row].indices) {
                 if (shape[row][col] != 1) continue
@@ -406,7 +237,6 @@ class FluidTetrisView @JvmOverloads constructor(
                 jellyRect.set(x - expand, y - expand, x + blockSize + expand, y + blockSize + expand)
                 canvas.drawRoundRect(jellyRect, cornerRadius, cornerRadius, paint)
 
-                // Bright oval highlight gives jelly sheen
                 if (jelly > 0.05f) {
                     paint.color = Color.argb((jelly * 90).toInt(), 255, 255, 255)
                     val hlR = blockSize * 0.18f * jelly
@@ -415,7 +245,6 @@ class FluidTetrisView @JvmOverloads constructor(
                     canvas.drawOval(jellyRect, paint)
                 }
 
-                // Block border fades in as piece solidifies
                 if (solidity > 0.15f) {
                     paint.color = Color.argb((solidity * 210).toInt(), 0, 0, 0)
                     paint.style = Paint.Style.STROKE
@@ -428,478 +257,5 @@ class FluidTetrisView @JvmOverloads constructor(
         }
 
         paint.isAntiAlias = false
-    }
-
-    private fun getHitCell(touchX: Float, touchY: Float): Pair<Int, Int>? =
-        hitCellFromTouch(touchX, touchY, pieceX, pieceY, pieceRotation, pieces[currentPiece])
-
-    private fun checkLines() {
-        var linesCleared = 0
-        for (i in gridRows - 1 downTo 0) {
-            if (grid[i].all { it != null }) {
-                // Remove the line
-                for (j in i downTo 1) {
-                    grid[j] = grid[j - 1].clone()
-                }
-                grid[0] = Array(gridColumns) { null }
-                linesCleared++
-            }
-        }
-        if (linesCleared > 0) {
-            score += linesCleared * 100
-            // Update high score if necessary
-            if (score > highScore) {
-                highScore = score
-            }
-            // Play sound effect for line clear
-            if (soundEnabled) {
-                playSound(R.raw.move_sound)
-            }
-        }
-    }
-
-    private fun checkCollisions() {
-        // Calculate grid cell size (matches grid boundaries: left=150f, right=width-150f, top=100f, bottom=height-180f)
-        val cellWidth = (width - 300f) / gridColumns
-        val cellHeight = (height - 280f) / gridRows
-
-        // Check for collision with the bottom
-        if (isPieceAtBottom()) {
-            if (!isWaitingToTurnRigidAtBottom) {
-                isWaitingToTurnRigidAtBottom = true
-                bottomCollisionTime = System.currentTimeMillis() // Start the timer
-            }
-        } else {
-            // Reset waiting state if not colliding with the bottom
-            isWaitingToTurnRigidAtBottom = false;
-        }
-
-        // Check if the bottom of the piece is at or below the top of the grid cell
-        if (isPieceCollidingWithAnotherPiece(cellWidth, cellHeight)) {
-            if (!isWaitingToTurnRigidAtPiece) {
-                isWaitingToTurnRigidAtPiece = true
-                pieceCollisionTime = System.currentTimeMillis() // Start the timer
-            }
-        } else {
-            // Reset waiting state if not colliding with another piece
-            isWaitingToTurnRigidAtPiece = false;
-        }
-    }
-
-    private fun turnPieceRigid() {
-        // Play sound effect for rigid transformation
-        if (soundEnabled) {
-            playSound(R.raw.rigid_sound)
-        }
-
-        // Normalize to [0, 360) then snap to nearest 90°
-        var normalized = pieceRotation % 360f
-        if (normalized < 0f) normalized += 360f
-        pieceRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
-
-        // Calculate grid cell size (matches grid boundaries: left=150f, right=width-150f, top=100f, bottom=height-180f)
-        val cellWidth = (width - 300f) / gridColumns
-        val cellHeight = (height - 280f) / gridRows
-
-        // Get the current piece shape and apply rotation
-        val currentPieceShape = pieces[currentPiece]
-        val rotatedShape = rotatePiece(currentPieceShape, pieceRotation)
-        val gridLeft = 150f
-        val gridTop = 100f
-
-        // Place the current piece in the grid based on its last position and shape
-        for (row in rotatedShape.indices) {
-            for (col in rotatedShape[row].indices) {
-                if (rotatedShape[row][col] == 1) { // Only check filled blocks
-                    val gridX = ((pieceX + col * 100f + 50f - gridLeft) / cellWidth).toInt()
-                    val gridY = ((pieceY + row * 100f + 50f - gridTop) / cellHeight).toInt()
-
-                    // Only place piece if it's within grid bounds
-                    if (gridX in 0 until gridColumns && gridY in 0 until gridRows) {
-                        grid[gridY][gridX] = currentPieceColor
-                    }
-                }
-            }
-        }
-
-        checkLines()
-
-        // Update current and next piece
-        currentPiece = nextPiece
-        currentPieceColor = nextPieceColor
-        nextPiece = (nextPiece + 1) % pieces.size
-        nextPieceColor = pieceColors[nextPiece]
-
-        // Reset piece position for the new piece
-        pieceX = (width / 2) - 50f
-        pieceY = 100f  // Start at the top
-        velocityY = 0f
-        pieceRotation = 0f
-
-        // Check if game is over
-        if (grid[0].any { it != null }) {
-            isGameOver = true
-        }
-    }
-
-    private fun moveUpUntilClear() {
-        val cellWidth = (width - 300f) / gridColumns
-        val cellHeight = (height - 280f) / gridRows
-        val gridLeft = 150f
-        val gridTop = 100f
-        val step = 5f
-        var moved = false
-
-        while (doesPieceCollideWithGridAtY(pieceY, cellWidth, cellHeight)) {
-            pieceY -= step
-            moved = true
-            if (pieceY < gridTop) break
-        }
-
-        if (moved) {
-            keepPiecesInsideWalls()
-        }
-    }
-
-    private fun doesPieceCollideWithGridAtY(testY: Float, cellWidth: Float, cellHeight: Float): Boolean {
-        val gridLeft = 150f
-        val gridTop = 100f
-        val blockSize = 100f
-
-        for ((bx, _) in rotatedBlockCenters(pieces[currentPiece], pieceX, testY, pieceRotation)) {
-            val by = testY + blockSize / 2f
-
-            val corners = listOf(
-                bx - blockSize / 2f to by - blockSize / 2f,
-                bx + blockSize / 2f to by - blockSize / 2f,
-                bx - blockSize / 2f to by + blockSize / 2f,
-                bx + blockSize / 2f to by + blockSize / 2f
-            )
-            for ((cx, cy) in corners) {
-                val cellX = ((cx - gridLeft) / cellWidth).toInt()
-                val cellY = ((cy - gridTop) / cellHeight).toInt()
-                if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
-                    if (grid[cellY][cellX] != null) return true
-                }
-            }
-        }
-        return false
-    }
-
-    private fun isPieceAtBottom(): Boolean {
-        val gridBottom = height - 180f
-        return rotatedBlockCenters(pieces[currentPiece], pieceX, pieceY, pieceRotation)
-            .any { (_, by) -> by + 50f > gridBottom }
-    }
-
-    private fun collideAtBottom(cellWidth: Float, cellHeight: Float) {
-        val currentPieceShape = pieces[currentPiece]
-        val gridLeft = 150f
-        val gridTop = 100f
-
-        for (row in currentPieceShape.indices) {
-            for (col in currentPieceShape[row].indices) {
-                if (currentPieceShape[row][col] == 1) { // Only check filled blocks
-                    val gridX = ((pieceX + col * 100f + 50f - gridLeft) / cellWidth).toInt()
-                    val gridY = ((pieceY + row * 100f + 50f - gridTop) / cellHeight).toInt()
-
-                    // Only place piece if it's within grid bounds
-                    if (gridX in 0 until gridColumns && gridY in 0 until gridRows) {
-                        grid[gridY][gridX] = currentPieceColor
-                    }
-                }
-            }
-        }
-        turnPieceRigid() // Call to turn the piece rigid after placing it
-    }
-
-    private fun isPieceCollidingWithAnotherPiece(cellWidth: Float, cellHeight: Float): Boolean {
-        val gridLeft = 150f
-        val gridTop = 100f
-        val blockSize = 100f
-        for ((bx, by) in rotatedBlockCenters(pieces[currentPiece], pieceX, pieceY, pieceRotation)) {
-            // Check all four corners of the block, not just the center
-            val corners = listOf(
-                bx - blockSize / 2f to by - blockSize / 2f,
-                bx + blockSize / 2f to by - blockSize / 2f,
-                bx - blockSize / 2f to by + blockSize / 2f,
-                bx + blockSize / 2f to by + blockSize / 2f
-            )
-            for ((cx, cy) in corners) {
-                val cellX = ((cx - gridLeft) / cellWidth).toInt()
-                val cellY = ((cy - gridTop) / cellHeight).toInt()
-                if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
-                    if (grid[cellY][cellX] != null) return true
-                }
-            }
-        }
-        return false
-    }
-
-    private fun collideWithAnotherPiece(cellWidth: Float, cellHeight: Float) {
-        // Get the rotated shape of the current piece
-        val rotatedShape = rotatePiece(pieces[currentPiece], pieceRotation)
-        val gridLeft = 150f
-        val gridTop = 100f
-
-        // Check for collision with other rigid pieces
-        for (row in rotatedShape.indices) {
-            for (col in rotatedShape[row].indices) {
-                if (rotatedShape[row][col] == 1) { // Only check filled blocks
-                    val cellX = ((pieceX - gridLeft + col * 100f) / cellWidth).toInt()
-                    val cellY = ((pieceY - gridTop + row * 100f) / cellHeight).toInt()
-
-                    // Check if the piece is colliding with the grid cell
-                    if (cellX in 0 until gridColumns && cellY in 0 until gridRows) {
-                        // Collision with a rigid piece - place the shape in the grid
-                        if (cellY - 1 >= 0) {
-                            for (r in rotatedShape.indices) {
-                                for (c in rotatedShape[r].indices) {
-                                    if (rotatedShape[r][c] == 1) {
-                                        val gridRow = cellY - 1 + r
-                                        val gridCol = cellX + c
-                                        if (gridRow in 0 until gridRows && gridCol in 0 until gridColumns) {
-                                            grid[gridRow][gridCol] = currentPieceColor
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        turnPieceRigid() // Call to turn the piece rigid after placing it
-                        return
-                    }
-                }
-            }
-        }
-    }
-
-    // Update method to handle gravity
-    fun update() {
-        if (!isPaused && !isGameOver) {
-            // Any active drag (movement or rotation) pauses gravity; resumes on finger lift
-            if (!isWaitingToTurnRigidAtBottom && !isWaitingToTurnRigidAtPiece
-                && !isDragging) {
-                pieceY += gravity
-            }
-
-            keepPiecesInsideWalls()
-            checkCollisions()
-
-            var didSolidify = false
-
-            if (isWaitingToTurnRigidAtBottom) {
-                if (System.currentTimeMillis() - bottomCollisionTime >= 3000) {
-                    isDragging = false
-                    turnPieceRigid()
-                    isWaitingToTurnRigidAtBottom = false
-                    isWaitingToTurnRigidAtPiece = false
-                    didSolidify = true
-                }
-            }
-
-            if (!didSolidify && isWaitingToTurnRigidAtPiece) {
-                if (System.currentTimeMillis() - pieceCollisionTime >= 3000) {
-                    isDragging = false
-                    moveUpUntilClear()
-                    turnPieceRigid()
-                    isWaitingToTurnRigidAtPiece = false
-                }
-            }
-
-            invalidate()
-        }
-    }
-
-    private fun keepPiecesInsideWalls() {
-        val centers = rotatedBlockCenters(pieces[currentPiece], pieceX, pieceY, pieceRotation)
-        pieceX = clampPieceXByCenters(centers, pieceX, 150f, width - 150f, 50f)
-    }
-
-    private fun resetGame() {
-        // Stop the game loop
-        handler.removeCallbacks(updateRunnable)
-
-        // First, clear the grid completely
-        for (i in 0 until gridRows) {
-            for (j in 0 until gridColumns) {
-                grid[i][j] = null
-            }
-        }
-
-        // Reset all game state variables
-        score = 0
-        isGameOver = false
-        isPaused = false
-        isDragging = false
-        isDraggingCenter = false
-        touchedBlockRow = 0
-        touchedBlockCol = 0
-        springForceX = 0f
-        springForceY = 0f
-        velocityY = 0f
-        pieceRotation = 0f
-        lastTouchX = 0f
-        lastTouchY = 0f
-
-        // Reset piece types and colors
-        currentPiece = 0
-        currentPieceColor = pieceColors[0]
-        nextPiece = 1
-        nextPieceColor = pieceColors[1]
-
-        // Reset piece position
-        pieceX = (width / 2) - 50f  // Center horizontally
-        pieceY = 100f  // Start at the top
-
-        // Force a redraw
-        invalidate()
-
-        // Restart the game loop after a short delay to ensure everything is reset
-        handler.postDelayed(updateRunnable, 100)
-    }
-
-    private fun playSound(soundResId: Int) {
-        try {
-            val sound = MediaPlayer.create(context, soundResId)
-            sound?.setOnCompletionListener { mp -> mp.release() }
-            sound?.start()
-        } catch (e: Exception) {
-            // Silently ignore sound playback errors
-        }
-    }
-}
-
-internal fun clampPieceX(
-    shape: List<List<Int>>,
-    pieceX: Float,
-    leftWall: Float,
-    rightWall: Float,
-    pieceSize: Float
-): Float {
-    var minCol = Int.MAX_VALUE
-    var maxCol = Int.MIN_VALUE
-    for (row in shape) {
-        for ((col, cell) in row.withIndex()) {
-            if (cell == 1) {
-                if (col < minCol) minCol = col
-                if (col > maxCol) maxCol = col
-            }
-        }
-    }
-    if (minCol == Int.MAX_VALUE) return pieceX
-    var x = pieceX
-    // Left wall: leftmost block's left edge must be at or right of the wall
-    val leftEdge = x + minCol * pieceSize
-    if (leftEdge < leftWall) x = leftWall - minCol * pieceSize
-    // Right wall: rightmost block's right edge must be at or left of the wall
-    val rightEdge = x + (maxCol + 1) * pieceSize
-    if (rightEdge > rightWall) x = rightWall - (maxCol + 1) * pieceSize
-    return x
-}
-
-// Maps a touch point to the canonical (row, col) of the hit block, accounting for pieceRotation.
-// Returns null if the touch is outside all filled blocks.
-internal fun hitCellFromTouch(
-    touchX: Float,
-    touchY: Float,
-    pieceX: Float,
-    pieceY: Float,
-    pieceRotation: Float,
-    shape: List<List<Int>>,
-    pieceSize: Float = 100f
-): Pair<Int, Int>? {
-    val rcx = pieceX + shape[0].size * pieceSize / 2f
-    val rcy = pieceY + shape.size * pieceSize / 2f
-    val angle = -pieceRotation * Math.PI / 180.0
-    val cosA = cos(angle)
-    val sinA = sin(angle)
-    val dx = (touchX - rcx).toDouble()
-    val dy = (touchY - rcy).toDouble()
-    val ux = (rcx + dx * cosA - dy * sinA).toFloat()
-    val uy = (rcy + dx * sinA + dy * cosA).toFloat()
-    val col = floor((ux - pieceX) / pieceSize).toInt()
-    val row = floor((uy - pieceY) / pieceSize).toInt()
-    if (row in shape.indices && col in shape[0].indices && shape[row][col] == 1) {
-        return row to col
-    }
-    return null
-}
-
-// Upward drag is attenuated so the player can slow the fall but not reverse it.
-internal fun effectiveVerticalDrag(dy: Float, upwardDragFactor: Float): Float =
-    if (dy < 0f) dy * upwardDragFactor else dy
-
-// Torque formula: cross product of (block→center) with drag vector, normalised by distance².
-// The caller subtracts the result from pieceRotation.
-internal fun rotationDeltaFromDrag(
-    vx: Float, vy: Float, dx: Float, dy: Float, sensitivity: Float
-): Float {
-    val cross = vx * dy - vy * dx
-    val dist2 = vx * vx + vy * vy + 1f
-    return cross / dist2 * sensitivity
-}
-
-internal fun clampPieceXByCenters(
-    centers: List<Pair<Float, Float>>,
-    pieceX: Float,
-    leftWall: Float,
-    rightWall: Float,
-    halfBlock: Float
-): Float {
-    if (centers.isEmpty()) return pieceX
-    val minBx = centers.minOf { it.first } - halfBlock
-    val maxBx = centers.maxOf { it.first } + halfBlock
-    var x = pieceX
-    if (minBx < leftWall) x += leftWall - minBx
-    if (maxBx > rightWall) x -= maxBx - rightWall
-    return x
-}
-
-// Returns the screen-space center of each filled block after applying the canvas rotation transform.
-// Mirrors the canvas.rotate(pieceRotation, cx, cy) call in onDraw() so collision checks use actual positions.
-internal fun rotatedBlockCenters(
-    shape: List<List<Int>>,
-    pieceX: Float,
-    pieceY: Float,
-    rotation: Float,
-    pieceSize: Float = 100f
-): List<Pair<Float, Float>> {
-    val rows = shape.size
-    val cols = if (rows > 0) shape[0].size else 0
-    val cx = pieceX + cols * pieceSize / 2f
-    val cy = pieceY + rows * pieceSize / 2f
-    val angle = rotation * Math.PI / 180.0
-    val cosA = cos(angle)
-    val sinA = sin(angle)
-    val result = mutableListOf<Pair<Float, Float>>()
-    for (row in shape.indices) {
-        for (col in shape[row].indices) {
-            if (shape[row][col] != 1) continue
-            val dx = pieceX + (col + 0.5f) * pieceSize - cx
-            val dy = pieceY + (row + 0.5f) * pieceSize - cy
-            result.add(
-                (cx + dx * cosA - dy * sinA).toFloat() to
-                (cy + dx * sinA + dy * cosA).toFloat()
-            )
-        }
-    }
-    return result
-}
-
-// Rotate a tetris piece shape around its center. Handles non-square shapes correctly.
-// For 90° CW: (r,c) → (c, rows-1-r) producing a cols×rows output.
-// For 270° CW: (r,c) → (cols-1-c, r) producing a cols×rows output.
-internal fun rotatePiece(shape: List<List<Int>>, rotation: Float): List<List<Int>> {
-    val rows = shape.size
-    val cols = if (rows > 0) shape[0].size else 0
-    return when (rotation.toInt() % 360) {
-        90 -> List(cols) { newRow ->
-            List(rows) { newCol -> shape[rows - 1 - newCol][newRow] }
-        }
-        180 -> shape.map { it.reversed() }.reversed()
-        270 -> List(cols) { newRow ->
-            List(rows) { newCol -> shape[newCol][cols - 1 - newRow] }
-        }
-        else -> shape
     }
 }
