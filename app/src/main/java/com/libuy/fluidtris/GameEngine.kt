@@ -2,6 +2,7 @@ package com.libuy.fluidtris
 
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.random.Random
 
 internal class GameEngine(
     private val onPieceLocked: () -> Unit,
@@ -32,6 +33,7 @@ internal class GameEngine(
     var currentPieceColor = GameConstants.PIECE_COLORS[0]
     var nextPiece = 1
     var nextPieceColor = GameConstants.PIECE_COLORS[1]
+    var nextPieceRotation = 0f
 
     private var bottomCollisionTime = 0L
     private var pieceCollisionTime = 0L
@@ -92,10 +94,11 @@ internal class GameEngine(
         isWaitingToTurnRigidAtBottom = false
         isWaitingToTurnRigidAtPiece = false
 
-        currentPiece = 0
-        currentPieceColor = GameConstants.PIECE_COLORS[0]
-        nextPiece = 1
-        nextPieceColor = GameConstants.PIECE_COLORS[1]
+        currentPiece = Random.nextInt(GameConstants.PIECES.size)
+        currentPieceColor = GameConstants.PIECE_COLORS[currentPiece]
+        nextPiece = Random.nextInt(GameConstants.PIECES.size)
+        nextPieceColor = GameConstants.PIECE_COLORS[nextPiece]
+        nextPieceRotation = Random.nextInt(4) * 90f
 
         pieceX = (viewWidth / 2) - 50f
         pieceY = GameConstants.GRID_TOP
@@ -250,13 +253,15 @@ internal class GameEngine(
 
         currentPiece = nextPiece
         currentPieceColor = nextPieceColor
-        nextPiece = (nextPiece + 1) % GameConstants.PIECES.size
+        val spawnRotation = nextPieceRotation
+        nextPiece = Random.nextInt(GameConstants.PIECES.size)
         nextPieceColor = GameConstants.PIECE_COLORS[nextPiece]
+        nextPieceRotation = Random.nextInt(4) * 90f
 
         pieceX = (viewWidth / 2) - 50f
         pieceY = GameConstants.GRID_TOP
         velocityY = 0f
-        pieceRotation = 0f
+        pieceRotation = spawnRotation
 
         if (grid[0].any { it != null }) {
             isGameOver = true

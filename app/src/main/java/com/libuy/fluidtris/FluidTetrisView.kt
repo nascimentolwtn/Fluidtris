@@ -20,6 +20,12 @@ class FluidTetrisView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
+    interface GameListener {
+        fun onExitPressed()
+    }
+
+    var gameListener: GameListener? = null
+
     private val paint = Paint().apply { style = Paint.Style.FILL }
     private val jellyRect = RectF()
     private val backgroundBitmap: Bitmap =
@@ -115,8 +121,13 @@ class FluidTetrisView @JvmOverloads constructor(
             previewX + previewBoxSize + 8f, previewY + previewBoxSize + 8f, paint)
         val pieceDrawX = previewX + (previewBoxSize - previewCols * previewBlockSize) / 2f
         val pieceDrawY = previewY + (previewBoxSize - previewRows * previewBlockSize) / 2f
+        val previewCenterX = previewX + previewBoxSize / 2f
+        val previewCenterY = previewY + previewBoxSize / 2f
+        canvas.save()
+        canvas.rotate(engine.nextPieceRotation, previewCenterX, previewCenterY)
         drawJellyPiece(canvas, nextShape, pieceDrawX, pieceDrawY,
             engine.nextPieceColor, 1f, previewBlockSize)
+        canvas.restore()
 
         paint.color = Color.argb(180, 20, 60, 100)
         canvas.drawRect(10f, 5f, 400f, 95f, paint)
@@ -138,11 +149,18 @@ class FluidTetrisView @JvmOverloads constructor(
         paint.textSize = 30f
         canvas.drawText("New Game", 35f, height - 100f, paint)
 
+        // Pause button (center)
         paint.color = Color.argb(200, 100, 150, 180)
-        canvas.drawRect(width - 200f, height - 150f, width - 20f, height - 50f, paint)
+        canvas.drawRect(width / 2 - 100f, height - 150f, width / 2 + 100f, height - 50f, paint)
         paint.color = Color.argb(255, 200, 240, 230)
         val pauseButtonText = if (engine.isPaused) "Resume" else "Pause"
-        canvas.drawText(pauseButtonText, width - 160f, height - 100f, paint)
+        canvas.drawText(pauseButtonText, width / 2 - 70f, height - 100f, paint)
+
+        // Exit button (right)
+        paint.color = Color.argb(200, 150, 80, 80)
+        canvas.drawRect(width - 200f, height - 150f, width - 20f, height - 50f, paint)
+        paint.color = Color.argb(255, 200, 240, 230)
+        canvas.drawText("Exit", width - 160f, height - 100f, paint)
 
         if (engine.isGameOver) {
             paint.color = Color.argb(150, 20, 40, 80)
@@ -152,7 +170,8 @@ class FluidTetrisView @JvmOverloads constructor(
             canvas.drawText("Game Over", width / 2 - 250f, height / 2 - 50f, paint)
             paint.textSize = 60f
             paint.color = Color.argb(255, 120, 200, 220)
-            canvas.drawText("High Score: ${engine.highScore}", width / 2 - 250f, height / 2 + 80f, paint)
+            canvas.drawText("Score: ${engine.score}", width / 2 - 250f, height / 2 + 80f, paint)
+            canvas.drawText("High Score: ${engine.highScore}", width / 2 - 250f, height / 2 + 150f, paint)
         }
 
         if (engine.isPaused && !engine.isGameOver) {
@@ -180,8 +199,12 @@ class FluidTetrisView @JvmOverloads constructor(
                     invalidate()
                     return true
                 }
-                if (event.x in (width - 200f)..(width - 20f) && event.y in (height - 150f)..(height - 50f)) {
+                if (event.x in (width / 2 - 100f)..(width / 2 + 100f) && event.y in (height - 150f)..(height - 50f)) {
                     engine.isPaused = !engine.isPaused
+                    return true
+                }
+                if (event.x in (width - 200f)..(width - 20f) && event.y in (height - 150f)..(height - 50f)) {
+                    gameListener?.onExitPressed()
                     return true
                 }
             }
