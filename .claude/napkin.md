@@ -26,8 +26,8 @@
 3. **[2026-06-03] Architecture: GameEngine + thin FluidTetrisView**
    Do instead: all game state and logic lives in `GameEngine.kt`; `FluidTetrisView.kt` is rendering/input only. Constants in `GameConstants.kt`, pure math in `GameMath.kt`, sound in `SoundManager.kt`. GameEngine has zero Android imports.
 
-4. **[2026-06-02] High score resets on app close — no persistence**
-   Do instead: to persist high score, write to `SharedPreferences`; `engine.highScore` is in-memory only.
+4. **[2026-06-04] High score load must be seeded before game loop starts**
+   Do instead: always call `engine.highScore = highScoreManager.loadHighScore()` in `FluidTetrisView.init` before `handler.post(updateRunnable)`. Saving is via `onHighScoreBeat`; forgetting the load means score resets on every launch.
 
 ## Domain Behavior Guardrails
 1. **[2026-06-03] Grid is 7×20; margins: left=150f, right=150f, top=100f, bottom=180f**
@@ -41,11 +41,12 @@
 
 ## Backlog
 1. **[feature] Ask player name when hitting new highscore** — show Android `AlertDialog` with `EditText` when `onHighScoreBeat` fires in FluidTetrisView; save name alongside score in SharedPreferences via new `HighScoreManager.saveHighScoreName()` method.
-2. **[polish] Fluid pieces more rounded, 3–5px smaller** — reduce piece block size while dragging (fluid state); keep solid piece size same; keep animation smooth. Makes pieces easier to fit in tight spaces.
-3. **[feature] Spring physics wiring** — deleted in refactor as dead code; re-add to `GameEngine` fields if spring feel is desired.
+2. **[feature] Spring physics wiring** — deleted in refactor as dead code; re-add to `GameEngine` fields if spring feel is desired.
 
 ## Done
-- **[2026-06-04] Feat: HighScore persistence via SharedPreferences** — `HighScoreManager.kt` (pre-written) instantiated in `FluidTetrisView`; `engine.highScore` seeded from prefs on init; `onHighScoreBeat` callback wired to save new scores. Survives app restart. No test changes needed (callback has default param).
+- **[2026-06-04] Fix: piece overwrites another piece when locked with rotation** — `lockPieceAtBottom()` was writing unrotated shape to grid, then `turnPieceRigid()` wrote rotated shape, causing overwrites. Removed redundant grid-writing from `lockPieceAtBottom()` to let `turnPieceRigid()` be sole lock authority. All 85 unit tests pass.
+- **[2026-06-04] Polish: fluid pieces 4px smaller with centered draw offset** — `fluidBlockSize = PIECE_SIZE - (1f - solidity) * 4f`; draw offset keeps visual center at rotation pivot; corner radius grows proportionally, giving rounder look when fluid. No logic/collision changes.
+- **[2026-06-04] Fix: HighScore not persisting across restarts** — `engine.highScore` was never seeded from SharedPreferences on startup. Added `engine.highScore = highScoreManager.loadHighScore()` in `FluidTetrisView.init`. Save path via `onHighScoreBeat` was already correct.
 - **[2026-06-03] Test campaign Phase 2 — GameEngine tests** — `GameEngineLineTest` (6), `GameEngineCollisionTest` (8), `GameEngineLockTest` (6), `GameEngineStateTest` (9). Bug found and fixed: `checkLines()` `for` loop skipped consecutive full rows; replaced with `while` that re-checks same index after each clear. All 85 unit tests pass.
 - **[2026-06-03] Refactor: God Object split** — `FluidTetrisView.kt` (750+ lines) split into `GameConstants.kt`, `GameMath.kt`, `SoundManager.kt`, `GameEngine.kt`, thin `FluidTetrisView.kt`. Dead code (`collideWithAnotherPiece`, spring fields) deleted. `assembleDebug` clean.
 - **[2026-06-03] Fix: rotated pieces can't reach left wall** — switched `keepPiecesInsideWalls()` to `clampPieceXByCenters()` with `rotatedBlockCenters()`. 4 regression tests added to `WallClampTest.kt`.
