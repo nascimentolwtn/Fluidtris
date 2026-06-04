@@ -43,6 +43,7 @@ class FluidTetrisView @JvmOverloads constructor(
     }
 
     init {
+        engine.highScore = highScoreManager.loadHighScore()
         handler.post(updateRunnable)
     }
 
@@ -88,12 +89,18 @@ class FluidTetrisView @JvmOverloads constructor(
 
         val currentPieceShape = GameConstants.PIECES[engine.currentPiece]
         val pieceSize = GameConstants.PIECE_SIZE
+
+        val solidity = engine.getCollisionSolidity()
+        val fluidBlockSize = pieceSize - (1f - solidity) * 4f
+        val drawOffsetX = currentPieceShape[0].size * (pieceSize - fluidBlockSize) / 2f
+        val drawOffsetY = currentPieceShape.size * (pieceSize - fluidBlockSize) / 2f
         canvas.save()
         canvas.rotate(engine.pieceRotation,
             engine.pieceX + (currentPieceShape[0].size * pieceSize) / 2,
             engine.pieceY + (currentPieceShape.size * pieceSize) / 2)
-        drawJellyPiece(canvas, currentPieceShape, engine.pieceX, engine.pieceY,
-            engine.currentPieceColor, engine.getCollisionSolidity())
+        drawJellyPiece(canvas, currentPieceShape,
+            engine.pieceX + drawOffsetX, engine.pieceY + drawOffsetY,
+            engine.currentPieceColor, solidity, fluidBlockSize)
         canvas.restore()
 
         val previewX = width - 200f
@@ -135,7 +142,8 @@ class FluidTetrisView @JvmOverloads constructor(
         paint.color = Color.argb(200, 100, 150, 180)
         canvas.drawRect(width - 200f, height - 150f, width - 20f, height - 50f, paint)
         paint.color = Color.argb(255, 200, 240, 230)
-        canvas.drawText("Pause", width - 160f, height - 100f, paint)
+        val pauseButtonText = if (engine.isPaused) "Resume" else "Pause"
+        canvas.drawText(pauseButtonText, width - 160f, height - 100f, paint)
 
         if (engine.isGameOver) {
             paint.color = Color.argb(150, 20, 40, 80)
@@ -146,6 +154,14 @@ class FluidTetrisView @JvmOverloads constructor(
             paint.textSize = 60f
             paint.color = Color.argb(255, 120, 200, 220)
             canvas.drawText("High Score: ${engine.highScore}", width / 2 - 250f, height / 2 + 80f, paint)
+        }
+
+        if (engine.isPaused && !engine.isGameOver) {
+            paint.color = Color.argb(150, 20, 40, 80)
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+            paint.color = Color.argb(255, 150, 200, 220)
+            paint.textSize = 80f
+            canvas.drawText("PAUSED", width / 2 - 200f, height / 2 - 50f, paint)
         }
     }
 
