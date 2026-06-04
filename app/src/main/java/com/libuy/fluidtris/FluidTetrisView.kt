@@ -103,21 +103,20 @@ class FluidTetrisView @JvmOverloads constructor(
             engine.currentPieceColor, solidity, fluidBlockSize)
         canvas.restore()
 
-        val previewX = width - 200f
-        val previewY = 50f
-        val previewPath = Path()
-        previewPath.moveTo(previewX, previewY)
-        previewPath.lineTo(previewX + pieceSize, previewY)
-        previewPath.lineTo(previewX + pieceSize, previewY + pieceSize)
-        previewPath.lineTo(previewX, previewY + pieceSize)
-        previewPath.close()
-        paint.color = engine.nextPieceColor
-        canvas.drawPath(previewPath, paint)
-        paint.color = Color.BLACK
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 2f
-        canvas.drawPath(previewPath, paint)
-        paint.style = Paint.Style.FILL
+        val nextShape = GameConstants.PIECES[engine.nextPiece]
+        val previewBlockSize = 50f
+        val previewCols = nextShape[0].size
+        val previewRows = nextShape.size
+        val previewBoxSize = 160f
+        val previewX = width - previewBoxSize - 20f
+        val previewY = 20f
+        paint.color = Color.argb(180, 20, 60, 100)
+        canvas.drawRect(previewX - 8f, previewY - 8f,
+            previewX + previewBoxSize + 8f, previewY + previewBoxSize + 8f, paint)
+        val pieceDrawX = previewX + (previewBoxSize - previewCols * previewBlockSize) / 2f
+        val pieceDrawY = previewY + (previewBoxSize - previewRows * previewBlockSize) / 2f
+        drawJellyPiece(canvas, nextShape, pieceDrawX, pieceDrawY,
+            engine.nextPieceColor, 1f, previewBlockSize)
 
         paint.color = Color.argb(180, 20, 60, 100)
         canvas.drawRect(10f, 5f, 400f, 95f, paint)
