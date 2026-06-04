@@ -26,9 +26,11 @@ class FluidTetrisView @JvmOverloads constructor(
         BitmapFactory.decodeResource(resources, R.drawable.game_background)
 
     private val soundManager = SoundManager(context)
+    private val highScoreManager = HighScoreManager(context)
     private val engine = GameEngine(
         onPieceLocked = { soundManager.playRigid() },
-        onLineCleared = { soundManager.playMove() }
+        onLineCleared = { soundManager.playMove() },
+        onHighScoreBeat = { newScore -> highScoreManager.saveHighScore(newScore) }
     )
 
     private val handler = Handler(Looper.getMainLooper())

@@ -282,6 +282,7 @@ internal class GameEngine(
             score += linesCleared * 100
             if (score > highScore) {
                 highScore = score
+                onHighScoreBeat(score)
             }
             onLineCleared()
         }
