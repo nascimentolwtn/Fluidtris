@@ -295,21 +295,6 @@ internal class GameEngine(
     }
 
     internal fun lockPieceAtBottom(viewWidth: Int, viewHeight: Int) {
-        val cellWidth = (viewWidth - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
-        val cellHeight = (viewHeight - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
-        val currentPieceShape = GameConstants.PIECES[currentPiece]
-
-        for (row in currentPieceShape.indices) {
-            for (col in currentPieceShape[row].indices) {
-                if (currentPieceShape[row][col] == 1) {
-                    val gridX = ((pieceX + col * GameConstants.PIECE_SIZE + GameConstants.PIECE_SIZE / 2 - GameConstants.GRID_LEFT) / cellWidth).toInt()
-                    val gridY = ((pieceY + row * GameConstants.PIECE_SIZE + GameConstants.PIECE_SIZE / 2 - GameConstants.GRID_TOP) / cellHeight).toInt()
-                    if (gridX in 0 until GameConstants.GRID_COLUMNS && gridY in 0 until GameConstants.GRID_ROWS) {
-                        grid[gridY][gridX] = currentPieceColor
-                    }
-                }
-            }
-        }
         turnPieceRigid(viewWidth, viewHeight)
     }
 
