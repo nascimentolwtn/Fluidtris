@@ -13,7 +13,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 
 private const val SPLASH_DURATION_MS = 2000L
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), FluidTetrisView.GameListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -33,6 +33,12 @@ class MainActivity : AppCompatActivity() {
             ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { _, insets ->
                 insets
             }
+
+            findViewById<FluidTetrisView>(R.id.gameView)?.gameListener = this
         }, SPLASH_DURATION_MS)
+    }
+
+    override fun onExitPressed() {
+        finish()
     }
 }
