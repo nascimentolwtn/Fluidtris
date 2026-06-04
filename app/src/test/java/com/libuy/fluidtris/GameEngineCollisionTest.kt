@@ -51,7 +51,7 @@ class GameEngineCollisionTest {
     @Test
     fun rotatedPieceTouchingBottom_true() {
         val e = engine()
-        // Vertical I-piece (90°): lowest center by = pieceY + 200.
+        e.currentPiece = 0   // I-piece: lowest center by = pieceY + 200 at 90°
         // Condition: pieceY + 200 + 50 > 1740 → pieceY > 1490
         e.pieceY = 1495f
         e.pieceRotation = 90f

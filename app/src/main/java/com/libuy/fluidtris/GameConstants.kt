@@ -10,6 +10,10 @@ internal object GameConstants {
     const val UPWARD_DRAG_FACTOR = 0.4f
     const val ROTATION_SENSITIVITY = 30f
     const val LOCK_DELAY_MS = 3000L
+    const val SPRING_CARRY = 0.5f   // fraction of horizontal drag velocity carried on release
+    const val SPRING_DAMPING = 0.80f // per-frame velocity retention after release
+    const val SLIDE_IMPULSE = 3.0f
+    const val BOUNCE_ROTATION_DEG = 3f  // degrees of tilt added per bounce event
     const val GAME_LOOP_INTERVAL_MS = 16L
     const val GRID_LEFT = 150f
     const val GRID_TOP = 100f

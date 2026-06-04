@@ -18,6 +18,8 @@ internal class GameEngine(
     var pieceRotation = 0f
     private var velocityY = 0f
 
+    private var springForceX = 0f
+
     var isDragging = false
     private var isDraggingCenter = false
     private var touchedBlockRow = 0
@@ -39,12 +41,21 @@ internal class GameEngine(
     private var pieceCollisionTime = 0L
     private var isWaitingToTurnRigidAtBottom = false
     private var isWaitingToTurnRigidAtPiece = false
+    private var isSlidingOnContact = false
+    private var slideDirection = 0f
+    private var bounceCount = 0
 
     fun update(viewWidth: Int, viewHeight: Int) {
         if (viewWidth == 0 || viewHeight == 0) return
         if (!isPaused && !isGameOver) {
             if (!isWaitingToTurnRigidAtBottom && !isWaitingToTurnRigidAtPiece && !isDragging) {
                 pieceY += GameConstants.GRAVITY
+            }
+
+            if (!isDragging && springForceX != 0f) {
+                pieceX += springForceX
+                springForceX *= GameConstants.SPRING_DAMPING
+                if (kotlin.math.abs(springForceX) < 0.1f) springForceX = 0f
             }
 
             keepPiecesInsideWalls(viewWidth)
@@ -88,11 +99,15 @@ internal class GameEngine(
         touchedBlockRow = 0
         touchedBlockCol = 0
         velocityY = 0f
+        springForceX = 0f
         pieceRotation = 0f
         lastTouchX = 0f
         lastTouchY = 0f
         isWaitingToTurnRigidAtBottom = false
         isWaitingToTurnRigidAtPiece = false
+        isSlidingOnContact = false
+        slideDirection = 0f
+        bounceCount = 0
 
         currentPiece = Random.nextInt(GameConstants.PIECES.size)
         currentPieceColor = GameConstants.PIECE_COLORS[currentPiece]
@@ -107,6 +122,7 @@ internal class GameEngine(
     fun onTouchDown(x: Float, y: Float): Boolean {
         val hitCell = hitCellFromTouch(x, y, pieceX, pieceY, pieceRotation, GameConstants.PIECES[currentPiece])
         if (hitCell != null) {
+            springForceX = 0f
             isDragging = true
             isDraggingCenter = hitCell in GameConstants.PIECE_CENTER_CELLS[currentPiece]
             touchedBlockRow = hitCell.first
@@ -122,6 +138,7 @@ internal class GameEngine(
         if (!isDragging) return
         val dx = x - lastTouchX
         val dy = y - lastTouchY
+        springForceX = dx * GameConstants.SPRING_CARRY
         var appliedDx = 0f
         var appliedDy = 0f
         val prevRotation = pieceRotation
@@ -205,22 +222,65 @@ internal class GameEngine(
         val cellWidth = (viewWidth - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
         val cellHeight = (viewHeight - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
 
-        if (isPieceAtBottom(viewHeight)) {
-            if (!isWaitingToTurnRigidAtBottom) {
-                isWaitingToTurnRigidAtBottom = true
-                bottomCollisionTime = System.currentTimeMillis()
-            }
-        } else {
-            isWaitingToTurnRigidAtBottom = false
-        }
+        val bottomContacts = countContactBlocksAtBottom(viewHeight)
+        val pieceContacts  = countContactBlocksWithPiece(cellWidth, cellHeight)
+        val totalContacts  = bottomContacts + pieceContacts
 
-        if (isPieceCollidingWithAnotherPiece(cellWidth, cellHeight)) {
-            if (!isWaitingToTurnRigidAtPiece) {
-                isWaitingToTurnRigidAtPiece = true
-                pieceCollisionTime = System.currentTimeMillis()
+        when {
+            totalContacts >= 2 || (bounceCount >= 4 && totalContacts >= 1) -> {
+                // Normal 2+ contacts OR piece exhausted 4 bounces without escaping → solidify.
+                isSlidingOnContact = false
+                slideDirection = 0f
+                if (bottomContacts > 0) {
+                    if (!isWaitingToTurnRigidAtBottom) {
+                        isWaitingToTurnRigidAtBottom = true
+                        bottomCollisionTime = System.currentTimeMillis()
+                        springForceX = 0f
+                    }
+                } else {
+                    isWaitingToTurnRigidAtBottom = false
+                }
+                if (pieceContacts > 0) {
+                    if (!isWaitingToTurnRigidAtPiece) {
+                        isWaitingToTurnRigidAtPiece = true
+                        pieceCollisionTime = System.currentTimeMillis()
+                        springForceX = 0f
+                    }
+                } else {
+                    isWaitingToTurnRigidAtPiece = false
+                }
             }
-        } else {
-            isWaitingToTurnRigidAtPiece = false
+            totalContacts == 1 -> {
+                isWaitingToTurnRigidAtBottom = false
+                isWaitingToTurnRigidAtPiece = false
+                if (pieceContacts > 0) {
+                    if (!isSlidingOnContact) {
+                        // First frame of this contact: one-time lateral + vertical push, plus tilt.
+                        bounceCount++
+                        val force = computeSlideForceX(viewHeight, cellWidth, cellHeight)
+                        slideDirection = if (force >= 0f) 1f else -1f
+                        springForceX = slideDirection * GameConstants.SLIDE_IMPULSE
+                        pieceY -= GameConstants.SLIDE_IMPULSE
+                        pieceRotation += slideDirection * GameConstants.BOUNCE_ROTATION_DEG
+                        isSlidingOnContact = true
+                    } else {
+                        springForceX = 0f
+                    }
+                } else {
+                    // Piece cleared the placed block — stop everything, allow fresh contact.
+                    isSlidingOnContact = false
+                    slideDirection = 0f
+                    springForceX = 0f
+                }
+            }
+            else -> {
+                // 0 contacts: piece is fully clear — reset bounce counter and state.
+                isSlidingOnContact = false
+                slideDirection = 0f
+                bounceCount = 0
+                isWaitingToTurnRigidAtBottom = false
+                isWaitingToTurnRigidAtPiece = false
+            }
         }
     }
 
@@ -261,7 +321,11 @@ internal class GameEngine(
         pieceX = (viewWidth / 2) - 50f
         pieceY = GameConstants.GRID_TOP
         velocityY = 0f
+        springForceX = 0f
         pieceRotation = spawnRotation
+        isSlidingOnContact = false
+        slideDirection = 0f
+        bounceCount = 0
 
         if (grid[0].any { it != null }) {
             isGameOver = true
@@ -328,6 +392,71 @@ internal class GameEngine(
             }
         }
         return false
+    }
+
+    private fun countContactBlocksAtBottom(viewHeight: Int): Int {
+        val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
+        return rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
+            .count { (_, by) -> by + GameConstants.PIECE_SIZE / 2 > gridBottom }
+    }
+
+    private fun countContactBlocksWithPiece(cellWidth: Float, cellHeight: Float): Int {
+        val blockSize = GameConstants.PIECE_SIZE
+        return rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
+            .count { (bx, by) ->
+                listOf(
+                    bx - blockSize / 2f to by - blockSize / 2f,
+                    bx + blockSize / 2f to by - blockSize / 2f,
+                    bx - blockSize / 2f to by + blockSize / 2f,
+                    bx + blockSize / 2f to by + blockSize / 2f
+                ).any { (cx, cy) ->
+                    val cellX = ((cx - GameConstants.GRID_LEFT) / cellWidth).toInt()
+                    val cellY = ((cy - GameConstants.GRID_TOP) / cellHeight).toInt()
+                    cellX in 0 until GameConstants.GRID_COLUMNS &&
+                    cellY in 0 until GameConstants.GRID_ROWS &&
+                    grid[cellY][cellX] != null
+                }
+            }
+    }
+
+    private fun computeSlideForceX(viewHeight: Int, cellWidth: Float, cellHeight: Float): Float {
+        val blockSize = GameConstants.PIECE_SIZE
+        val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
+        val centers = rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
+
+        val contactXs = mutableListOf<Float>()
+        // Bottom-wall contacts: use the falling block's own center X
+        centers.forEach { (bx, by) ->
+            if (by + blockSize / 2f > gridBottom) contactXs.add(bx)
+        }
+        // Piece-to-piece contacts: use the placed block's center X so that direction
+        // is determined by where the obstacle actually is, not which side of the falling
+        // piece the contacting block happens to sit on.
+        val hitCells = mutableSetOf<Pair<Int, Int>>()
+        centers.forEach { (bx, by) ->
+            listOf(
+                bx - blockSize / 2f to by - blockSize / 2f,
+                bx + blockSize / 2f to by - blockSize / 2f,
+                bx - blockSize / 2f to by + blockSize / 2f,
+                bx + blockSize / 2f to by + blockSize / 2f
+            ).forEach { (cx, cy) ->
+                val cellX = ((cx - GameConstants.GRID_LEFT) / cellWidth).toInt()
+                val cellY = ((cy - GameConstants.GRID_TOP) / cellHeight).toInt()
+                if (cellX in 0 until GameConstants.GRID_COLUMNS &&
+                    cellY in 0 until GameConstants.GRID_ROWS &&
+                    grid[cellY][cellX] != null) {
+                    hitCells.add(cellX to cellY)
+                }
+            }
+        }
+        hitCells.forEach { (cellX, _) ->
+            contactXs.add(GameConstants.GRID_LEFT + (cellX + 0.5f) * cellWidth)
+        }
+
+        if (contactXs.isEmpty()) return 0f
+        val pieceCenterX = centers.map { it.first }.average().toFloat()
+        val contactCenterX = contactXs.average().toFloat()
+        return if (contactCenterX > pieceCenterX) -GameConstants.SLIDE_IMPULSE else GameConstants.SLIDE_IMPULSE
     }
 
     private fun moveUpUntilClear(viewWidth: Int, viewHeight: Int) {
