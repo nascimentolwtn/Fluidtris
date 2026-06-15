@@ -30,6 +30,7 @@ internal class GameEngine(
     var isPaused = false
     var isGameOver = true  // stays true until resetGame() is called with real dimensions
     var wasManuallyPausedBeforeSystemPause = false
+    var justBeatHighScore = false
 
     var currentPiece = 0
     var currentPieceColor = GameConstants.PIECE_COLORS[0]
@@ -125,6 +126,7 @@ internal class GameEngine(
         slideDirection = 0f
         bounceCount = 0
         isSnapAnimating = false
+        justBeatHighScore = false
 
         currentPiece = Random.nextInt(GameConstants.PIECES.size)
         currentPieceColor = GameConstants.PIECE_COLORS[currentPiece]
@@ -430,6 +432,7 @@ internal class GameEngine(
             score += points
             if (score > highScore) {
                 highScore = score
+                justBeatHighScore = true
                 onHighScoreBeat(score)
             }
             onLineCleared()

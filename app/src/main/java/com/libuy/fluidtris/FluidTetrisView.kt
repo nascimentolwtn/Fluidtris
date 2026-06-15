@@ -38,11 +38,9 @@ class FluidTetrisView @JvmOverloads constructor(
     private val engine = GameEngine(
         onPieceLocked = { soundManager.playRigid() },
         onLineCleared = { soundManager.playMove() },
-        onHighScoreBeat = { newScore ->
-            highScoreManager.saveHighScore(newScore)
-            showHighScoreNameDialog(newScore)
-        }
+        onHighScoreBeat = { newScore -> highScoreManager.saveHighScore(newScore) }
     )
+    private var pendingNameDialog = false
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {
@@ -67,7 +65,7 @@ class FluidTetrisView @JvmOverloads constructor(
         val input = EditText(context).apply {
             hint = "Enter your name"
             setText(highScoreManager.loadHighScoreName())
-            setSelection(text.length)
+            selectAll()
         }
 
         AlertDialog.Builder(context)
@@ -196,7 +194,7 @@ class FluidTetrisView @JvmOverloads constructor(
             paint.textSize = 80f
             canvas.drawText("Game Over", width / 2 - 250f, height / 2 - 50f, paint)
             paint.textSize = 60f
-            paint.color = Color.argb(255, 120, 200, 220)
+            paint.color = if (engine.justBeatHighScore) Color.YELLOW else Color.argb(255, 120, 200, 220)
             canvas.drawText("Score: ${engine.score}", width / 2 - 250f, height / 2 + 80f, paint)
             canvas.drawText("High Score: ${engine.highScore}", width / 2 - 250f, height / 2 + 150f, paint)
 
@@ -217,6 +215,11 @@ class FluidTetrisView @JvmOverloads constructor(
             canvas.drawRect(exitX, buttonY, exitX + buttonWidth, buttonY + buttonHeight, paint)
             paint.color = Color.argb(255, 255, 255, 255)
             canvas.drawText("Exit", exitX + 100f, buttonY + 80f, paint)
+
+            if (engine.justBeatHighScore && !pendingNameDialog) {
+                pendingNameDialog = true
+                showHighScoreNameDialog(engine.score)
+            }
         }
 
         if (engine.isPaused && !engine.isGameOver) {
@@ -241,6 +244,7 @@ class FluidTetrisView @JvmOverloads constructor(
 
                     if (event.x in newGameX..(newGameX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
                         engine.resetGame(width, height)
+                        pendingNameDialog = false
                         invalidate()
                         return true
                     }
@@ -260,6 +264,7 @@ class FluidTetrisView @JvmOverloads constructor(
                 }
                 if (event.x in 20f..200f && event.y in (height - 150f)..(height - 50f)) {
                     engine.resetGame(width, height)
+                    pendingNameDialog = false
                     invalidate()
                     return true
                 }
