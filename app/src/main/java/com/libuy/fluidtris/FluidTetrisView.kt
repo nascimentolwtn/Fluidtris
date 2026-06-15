@@ -165,6 +165,9 @@ class FluidTetrisView @JvmOverloads constructor(
         if (engine.isGameOver) {
             paint.color = Color.argb(150, 20, 40, 80)
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        }
+
+        if (engine.isGameOver) {
             paint.color = Color.argb(255, 150, 200, 220)
             paint.textSize = 80f
             canvas.drawText("Game Over", width / 2 - 250f, height / 2 - 50f, paint)
