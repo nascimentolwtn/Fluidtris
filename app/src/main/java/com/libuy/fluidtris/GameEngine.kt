@@ -61,6 +61,15 @@ internal class GameEngine(
             keepPiecesInsideWalls(viewWidth)
             checkCollisions(viewWidth, viewHeight)
 
+            if (!isDragging && (isWaitingToTurnRigidAtBottom || isWaitingToTurnRigidAtPiece)) {
+                val elapsed = when {
+                    isWaitingToTurnRigidAtBottom -> System.currentTimeMillis() - bottomCollisionTime
+                    else                         -> System.currentTimeMillis() - pieceCollisionTime
+                }
+                val t = (elapsed / GameConstants.LOCK_DELAY_MS.toFloat()).coerceIn(0f, 1f)
+                applySnapPull(viewWidth, viewHeight, t * t * GameConstants.SNAP_PULL_SPEED)
+            }
+
             var didSolidify = false
 
             if (isWaitingToTurnRigidAtBottom) {
@@ -502,6 +511,30 @@ internal class GameEngine(
         val pieceCenterX = centers.map { it.first }.average().toFloat()
         val contactCenterX = contactXs.average().toFloat()
         return if (contactCenterX > pieceCenterX) -GameConstants.SLIDE_IMPULSE else GameConstants.SLIDE_IMPULSE
+    }
+
+    private fun applySnapPull(viewWidth: Int, viewHeight: Int, strength: Float) {
+        val cellWidth  = (viewWidth  - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN)  / GameConstants.GRID_COLUMNS
+        val cellHeight = (viewHeight - GameConstants.GRID_TOP  - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
+
+        var normalized = pieceRotation % 360f
+        if (normalized < 0f) normalized += 360f
+        val snappedRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
+
+        val centers = rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, snappedRotation)
+        var totalDx = 0f; var totalDy = 0f; var count = 0
+        for ((bx, by) in centers) {
+            val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt().coerceIn(0, GameConstants.GRID_COLUMNS - 1)
+            val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt().coerceIn(0, GameConstants.GRID_ROWS - 1)
+            totalDx += GameConstants.GRID_LEFT + (gx + 0.5f) * cellWidth - bx
+            totalDy += GameConstants.GRID_TOP  + (gy + 0.5f) * cellHeight - by
+            count++
+        }
+        if (count == 0) return
+
+        pieceX += (totalDx / count) * strength
+        pieceY += (totalDy / count) * strength
+        pieceRotation = lerpAngleDeg(pieceRotation, snappedRotation, strength)
     }
 
     private fun moveUpUntilClear(viewWidth: Int, viewHeight: Int) {

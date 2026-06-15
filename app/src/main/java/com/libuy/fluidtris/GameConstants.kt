@@ -15,6 +15,7 @@ internal object GameConstants {
     const val SLIDE_IMPULSE = 3.0f
     const val BOUNCE_ROTATION_DEG = 3f  // degrees of tilt added per bounce event
     const val BLOCK_INSET = 1.5f        // per-side visual and collision shrink (3px total)
+    const val SNAP_PULL_SPEED = 0.06f   // max per-frame lerp strength (reached at t=1 of lock timer)
     const val GAME_LOOP_INTERVAL_MS = 16L
     const val GRID_LEFT = 150f
     const val GRID_TOP = 100f

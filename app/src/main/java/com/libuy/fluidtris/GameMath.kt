@@ -119,6 +119,12 @@ internal fun rotatedBlockCenters(
     return result
 }
 
+// Lerps between two angles (degrees) via the shortest arc.
+internal fun lerpAngleDeg(from: Float, to: Float, t: Float): Float {
+    val delta = ((to - from) % 360f + 540f) % 360f - 180f
+    return from + delta * t
+}
+
 // Rotate a tetris piece shape around its center. Handles non-square shapes correctly.
 // For 90° CW: (r,c) → (c, rows-1-r) producing a cols×rows output.
 // For 270° CW: (r,c) → (cols-1-c, r) producing a cols×rows output.
