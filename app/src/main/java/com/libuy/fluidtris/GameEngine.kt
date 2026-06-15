@@ -588,21 +588,11 @@ internal class GameEngine(
     }
 
     private fun doesPieceCollideWithGridAtY(testY: Float, cellWidth: Float, cellHeight: Float): Boolean {
-        val blockSize = GameConstants.PIECE_SIZE
-
         for ((bx, by) in rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, testY, pieceRotation)) {
-            val corners = listOf(
-                bx - blockSize / 2f to by - blockSize / 2f,
-                bx + blockSize / 2f to by - blockSize / 2f,
-                bx - blockSize / 2f to by + blockSize / 2f,
-                bx + blockSize / 2f to by + blockSize / 2f
-            )
-            for ((cx, cy) in corners) {
-                val cellX = ((cx - GameConstants.GRID_LEFT) / cellWidth).toInt()
-                val cellY = ((cy - GameConstants.GRID_TOP) / cellHeight).toInt()
-                if (cellX in 0 until GameConstants.GRID_COLUMNS && cellY in 0 until GameConstants.GRID_ROWS) {
-                    if (grid[cellY][cellX] != null) return true
-                }
+            val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
+            val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
+            if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS && grid[gy][gx] != null) {
+                return true
             }
         }
         return false

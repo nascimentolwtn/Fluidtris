@@ -45,6 +45,10 @@
 3. **[2026-06-02] Rotation gesture: top-half drag = clockwise, bottom-half = counter-clockwise**
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
+## In Progress
+1. **[2026-06-15] [bug fix] "piece locks 1 row too high" — plan at `.claude/plans/fix-piece-locks-1-row-high.md`**
+   Fix already applied to `GameEngine.kt` lines 590–599 (center-based `doesPieceCollideWithGridAtY`). Regression test still needed, then run `./gradlew testDebugUnitTest` and commit.
+
 ## Backlog
 1. **[2026-06-15] [feature] Show "New Game" button on gameover** — when game ends, display a large "New Game" button below the scores. Tapping it resets the game and starts a new round.
 2. **[feature] Ask player name when hitting new highscore** — show Android `AlertDialog` with `EditText` when `onHighScoreBeat` fires in FluidTetrisView; save name alongside score in SharedPreferences via new `HighScoreManager.saveHighScoreName()` method.

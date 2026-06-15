@@ -105,4 +105,49 @@ class SnapToGridTest {
     @Test fun z_90deg()  = assertSnapsAndLocksCleanly(6,  90f)
     @Test fun z_180deg() = assertSnapsAndLocksCleanly(6, 180f)
     @Test fun z_270deg() = assertSnapsAndLocksCleanly(6, 270f)
+
+    // ── Piece-on-piece: regression for doesPieceCollideWithGridAtY ─────────
+    // Verifies the isWaitingToTurnRigidAtPiece path (moveUpUntilClear →
+    // turnPieceRigid). Pre-filling row 17 forces piece-on-piece contact;
+    // the L piece at a non-canonical angle is the scenario most likely to
+    // trigger spurious pushes from axis-aligned corner detection.
+    // Expected: bottom cell locked in row 16 (directly above filled row 17).
+    @Test
+    fun lPiece_45deg_onTopOfFilledRow_locksAtCorrectRow() {
+        val L_PIECE = 3
+        var locked = false
+        var fakeTime = 0L
+        val e = GameEngine(onPieceLocked = { locked = true }, onLineCleared = {})
+        e.currentTimeMs = { fakeTime }
+        e.resetGame(VW, VH)
+
+        // Pre-fill row 17 at columns 1-4 (partial row — avoids line-clear).
+        // Use plain Int (not android.graphics.Color — no Android SDK in unit tests).
+        for (gx in 1..4) e.grid[17][gx] = 1
+
+        // L piece at 45° just above the filled cells. pieceY=1280 lets
+        // gravity carry it into contact within a few ticks.
+        e.currentPiece = L_PIECE
+        e.pieceRotation = 45f
+        e.pieceX = PIECE_X
+        e.pieceY = 1280f
+
+        repeat(220) { fakeTime += 16L; e.update(VW, VH) }
+
+        assertTrue("L@45° on filled row 17: should lock", locked)
+
+        // Collect all newly placed cells (exclude the pre-filled row 17 sentinel).
+        val placed = mutableSetOf<Pair<Int, Int>>()
+        for (gy in 0 until GameConstants.GRID_ROWS)
+            for (gx in 0 until GameConstants.GRID_COLUMNS)
+                if (e.grid[gy][gx] != null && gy != 17) placed.add(gx to gy)
+
+        assertEquals("L@45° on filled row 17: expected 4 placed cells, got $placed", 4, placed.size)
+
+        val bottomGy = placed.maxOf { it.second }
+        assertEquals(
+            "L@45° should lock with bottommost cell in row 16 (directly above pre-filled row 17), got row $bottomGy",
+            16, bottomGy
+        )
+    }
 }
