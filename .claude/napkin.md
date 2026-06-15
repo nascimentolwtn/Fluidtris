@@ -45,15 +45,12 @@
 3. **[2026-06-02] Rotation gesture: top-half drag = clockwise, bottom-half = counter-clockwise**
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
-## In Progress
-1. **[2026-06-15] [bug fix] "piece locks 1 row too high" — plan at `.claude/plans/fix-piece-locks-1-row-high.md`**
-   Fix already applied to `GameEngine.kt` lines 590–599 (center-based `doesPieceCollideWithGridAtY`). Regression test still needed, then run `./gradlew testDebugUnitTest` and commit.
-
 ## Backlog
 1. **[2026-06-15] [feature] Show "New Game" button on gameover** — when game ends, display a large "New Game" button below the scores. Tapping it resets the game and starts a new round.
 2. **[feature] Ask player name when hitting new highscore** — show Android `AlertDialog` with `EditText` when `onHighScoreBeat` fires in FluidTetrisView; save name alongside score in SharedPreferences via new `HighScoreManager.saveHighScoreName()` method.
 
 ## Done
+- **[2026-06-15] Fix: spurious upward push in moveUpUntilClear** — `doesPieceCollideWithGridAtY` used axis-aligned ±50 corners (too wide vs cellHeight=82), causing unnecessary pushes on piece-on-piece lock path. Replaced with center-based detection. Regression test: L@45° on pre-filled row 17 locks at row 16. 130 tests pass. Committed `1a705df`.
 - **[2026-06-15] Feature: snap-to-grid animation during lock countdown** — when the lock timer starts, `beginSnapAnimation()` computes the exact grid-aligned `(X, Y, rotation)` target once. `applySnapPull(t)` lerps the piece there each frame (linear ramp; separate `SNAP_PULL_SPEED=0.12` for X/Y and `SNAP_ROTATION_SPEED=0.28` for rotation). The timer is guarded: transit movement (including upward Y) does not reset it. Dragging to open space cancels the snap and returns the piece to fluid. `lerpAngleDeg()` added to `GameMath.kt` for shortest-arc rotation lerp. `currentTimeMs` injected into `GameEngine` for deterministic unit tests. 125 tests pass.
 - **[2026-06-04] Feature: prancy marshmallow bounce physics** — on contact without a clean lock position, the piece bounces with `springForceX` impulse + `BOUNCE_ROTATION_DEG` tilt. After 4 bounces, force-locks as safety net. `bounceCount`, `slideDirection`, `isSlidingOnContact` track state. Tagged `gameplay-v1-bounce-physics`.
 - **[2026-06-04] Fix: piece overwrites another piece when locked with rotation** — two bugs: (1) `doesPieceCollideWithGridAtY` ignored actual `by` from `rotatedBlockCenters`, using `testY+50f` for all blocks; (2) `turnPieceRigid` snaps rotation before writing to grid but never re-checked for overlap in the snapped shape. Fix: corrected `doesPieceCollideWithGridAtY` to use real `by`, added post-snap overlap-clearing loop in `turnPieceRigid` using the same coord formula as the grid write. 1 regression test added. 86 tests pass.
