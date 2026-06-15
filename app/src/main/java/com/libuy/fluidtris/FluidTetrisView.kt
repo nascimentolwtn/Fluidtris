@@ -1,5 +1,6 @@
 package com.libuy.fluidtris
 
+import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -13,6 +14,7 @@ import android.os.Looper
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.widget.EditText
 
 class FluidTetrisView @JvmOverloads constructor(
     context: Context,
@@ -36,7 +38,10 @@ class FluidTetrisView @JvmOverloads constructor(
     private val engine = GameEngine(
         onPieceLocked = { soundManager.playRigid() },
         onLineCleared = { soundManager.playMove() },
-        onHighScoreBeat = { newScore -> highScoreManager.saveHighScore(newScore) }
+        onHighScoreBeat = { newScore ->
+            highScoreManager.saveHighScore(newScore)
+            showHighScoreNameDialog(newScore)
+        }
     )
 
     private val handler = Handler(Looper.getMainLooper())
@@ -56,6 +61,25 @@ class FluidTetrisView @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldW: Int, oldH: Int) {
         super.onSizeChanged(w, h, oldW, oldH)
         engine.resetGame(w, h)
+    }
+
+    private fun showHighScoreNameDialog(newScore: Int) {
+        val input = EditText(context).apply {
+            hint = "Enter your name"
+            setText(highScoreManager.loadHighScoreName())
+            setSelection(text.length)
+        }
+
+        AlertDialog.Builder(context)
+            .setTitle("New High Score!")
+            .setMessage("Score: $newScore\nEnter your name:")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val name = input.text.toString().trim()
+                highScoreManager.saveHighScoreName(if (name.isEmpty()) "Player" else name)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -176,15 +200,23 @@ class FluidTetrisView @JvmOverloads constructor(
             canvas.drawText("Score: ${engine.score}", width / 2 - 250f, height / 2 + 80f, paint)
             canvas.drawText("High Score: ${engine.highScore}", width / 2 - 250f, height / 2 + 150f, paint)
 
-            val buttonWidth = 400f
+            val buttonWidth = 320f
             val buttonHeight = 120f
-            val buttonX = (width - buttonWidth) / 2
+            val buttonGap = 30f
+            val newGameX = (width - 2 * buttonWidth - buttonGap) / 2
+            val exitX = newGameX + buttonWidth + buttonGap
             val buttonY = height / 2 + 260f
+
             paint.color = Color.argb(220, 80, 180, 150)
-            canvas.drawRect(buttonX, buttonY, buttonX + buttonWidth, buttonY + buttonHeight, paint)
+            canvas.drawRect(newGameX, buttonY, newGameX + buttonWidth, buttonY + buttonHeight, paint)
             paint.color = Color.argb(255, 255, 255, 255)
-            paint.textSize = 60f
-            canvas.drawText("New Game", buttonX + 50f, buttonY + 85f, paint)
+            paint.textSize = 50f
+            canvas.drawText("New Game", newGameX + 20f, buttonY + 80f, paint)
+
+            paint.color = Color.argb(220, 180, 80, 80)
+            canvas.drawRect(exitX, buttonY, exitX + buttonWidth, buttonY + buttonHeight, paint)
+            paint.color = Color.argb(255, 255, 255, 255)
+            canvas.drawText("Exit", exitX + 100f, buttonY + 80f, paint)
         }
 
         if (engine.isPaused && !engine.isGameOver) {
@@ -200,13 +232,20 @@ class FluidTetrisView @JvmOverloads constructor(
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 if (engine.isGameOver) {
-                    val buttonWidth = 400f
+                    val buttonWidth = 320f
                     val buttonHeight = 120f
-                    val buttonX = (width - buttonWidth) / 2
+                    val buttonGap = 30f
+                    val newGameX = (width - 2 * buttonWidth - buttonGap) / 2
+                    val exitX = newGameX + buttonWidth + buttonGap
                     val buttonY = height / 2 + 260f
-                    if (event.x in buttonX..(buttonX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
+
+                    if (event.x in newGameX..(newGameX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
                         engine.resetGame(width, height)
                         invalidate()
+                        return true
+                    }
+                    if (event.x in exitX..(exitX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
+                        gameListener?.onExitPressed()
                         return true
                     }
                     return true

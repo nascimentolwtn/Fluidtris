@@ -16,4 +16,12 @@ internal class HighScoreManager(context: Context) {
     fun isNewHighScore(score: Int): Boolean {
         return score > loadHighScore()
     }
+
+    fun loadHighScoreName(): String {
+        return prefs.getString("high_score_name", "Player") ?: "Player"
+    }
+
+    fun saveHighScoreName(name: String) {
+        prefs.edit().putString("high_score_name", name.take(20)).apply()
+    }
 }
