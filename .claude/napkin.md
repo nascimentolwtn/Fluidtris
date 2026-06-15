@@ -46,10 +46,10 @@
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
 ## Backlog
-1. **[2026-06-15] [feature] Show "New Game" button on gameover** — when game ends, display a large "New Game" button below the scores. Tapping it resets the game and starts a new round.
-2. **[feature] Ask player name when hitting new highscore** — show Android `AlertDialog` with `EditText` when `onHighScoreBeat` fires in FluidTetrisView; save name alongside score in SharedPreferences via new `HighScoreManager.saveHighScoreName()` method.
+(empty)
 
 ## Done
+- **[2026-06-15] Feature: Exit button on game-over + player name on high score** — Exit button added next to New Game on game-over screen (320px each, red). AlertDialog shows when new high score is beaten; player name persisted in SharedPreferences. All 130 tests pass. Committed `8eb6978`.
 - **[2026-06-15] Fix: spurious upward push in moveUpUntilClear** — `doesPieceCollideWithGridAtY` used axis-aligned ±50 corners (too wide vs cellHeight=82), causing unnecessary pushes on piece-on-piece lock path. Replaced with center-based detection. Regression test: L@45° on pre-filled row 17 locks at row 16. 130 tests pass. Committed `1a705df`.
 - **[2026-06-15] Feature: snap-to-grid animation during lock countdown** — when the lock timer starts, `beginSnapAnimation()` computes the exact grid-aligned `(X, Y, rotation)` target once. `applySnapPull(t)` lerps the piece there each frame (linear ramp; separate `SNAP_PULL_SPEED=0.12` for X/Y and `SNAP_ROTATION_SPEED=0.28` for rotation). The timer is guarded: transit movement (including upward Y) does not reset it. Dragging to open space cancels the snap and returns the piece to fluid. `lerpAngleDeg()` added to `GameMath.kt` for shortest-arc rotation lerp. `currentTimeMs` injected into `GameEngine` for deterministic unit tests. 125 tests pass.
 - **[2026-06-04] Feature: prancy marshmallow bounce physics** — on contact without a clean lock position, the piece bounces with `springForceX` impulse + `BOUNCE_ROTATION_DEG` tilt. After 4 bounces, force-locks as safety net. `bounceCount`, `slideDirection`, `isSlidingOnContact` track state. Tagged `gameplay-v1-bounce-physics`.
