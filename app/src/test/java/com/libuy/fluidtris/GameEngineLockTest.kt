@@ -99,9 +99,10 @@ class GameEngineLockTest {
         // At 90° the I-piece occupies a single column (col 3), not four columns.
         e.pieceRotation = 91f
         e.turnPieceRigid(VW, VH)
-        // Col 3 is filled (same gridX for all 4 blocks at 90°)
-        assertNotNull(e.grid[0][3])
-        // Col 4 would be filled at 0° but is empty at 90°, confirming the snap happened
-        assertNull(e.grid[0][4])
+        // At 90° the I-piece rotates all blocks to bx = cx = pieceX + cols*100/2 = 490+200 = 690
+        // gridX = (690 - GRID_LEFT) / cellWidth = 540 / 111.43 ≈ 4
+        assertNotNull(e.grid[0][4])
+        // Col 3 is filled at 0° (4 horizontal blocks) but empty at 90°, confirming the snap
+        assertNull(e.grid[0][3])
     }
 }

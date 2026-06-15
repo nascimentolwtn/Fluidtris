@@ -37,6 +37,8 @@ internal class GameEngine(
     var nextPieceColor = GameConstants.PIECE_COLORS[1]
     var nextPieceRotation = 0f
 
+    internal var currentTimeMs: () -> Long = System::currentTimeMillis
+
     private var bottomCollisionTime = 0L
     private var pieceCollisionTime = 0L
     private var isWaitingToTurnRigidAtBottom = false
@@ -63,8 +65,8 @@ internal class GameEngine(
 
             if (!isDragging && (isWaitingToTurnRigidAtBottom || isWaitingToTurnRigidAtPiece)) {
                 val elapsed = when {
-                    isWaitingToTurnRigidAtBottom -> System.currentTimeMillis() - bottomCollisionTime
-                    else                         -> System.currentTimeMillis() - pieceCollisionTime
+                    isWaitingToTurnRigidAtBottom -> currentTimeMs() - bottomCollisionTime
+                    else                         -> currentTimeMs() - pieceCollisionTime
                 }
                 val t = (elapsed / GameConstants.LOCK_DELAY_MS.toFloat()).coerceIn(0f, 1f)
                 applySnapPull(viewWidth, viewHeight, t * t * GameConstants.SNAP_PULL_SPEED)
@@ -73,7 +75,7 @@ internal class GameEngine(
             var didSolidify = false
 
             if (isWaitingToTurnRigidAtBottom) {
-                if (System.currentTimeMillis() - bottomCollisionTime >= GameConstants.LOCK_DELAY_MS) {
+                if (currentTimeMs() - bottomCollisionTime >= GameConstants.LOCK_DELAY_MS) {
                     isDragging = false
                     turnPieceRigid(viewWidth, viewHeight)
                     isWaitingToTurnRigidAtBottom = false
@@ -83,7 +85,7 @@ internal class GameEngine(
             }
 
             if (!didSolidify && isWaitingToTurnRigidAtPiece) {
-                if (System.currentTimeMillis() - pieceCollisionTime >= GameConstants.LOCK_DELAY_MS) {
+                if (currentTimeMs() - pieceCollisionTime >= GameConstants.LOCK_DELAY_MS) {
                     isDragging = false
                     moveUpUntilClear(viewWidth, viewHeight)
                     turnPieceRigid(viewWidth, viewHeight)
@@ -208,8 +210,8 @@ internal class GameEngine(
 
     fun getCollisionSolidity(): Float {
         val elapsed = when {
-            isWaitingToTurnRigidAtBottom -> System.currentTimeMillis() - bottomCollisionTime
-            isWaitingToTurnRigidAtPiece -> System.currentTimeMillis() - pieceCollisionTime
+            isWaitingToTurnRigidAtBottom -> currentTimeMs() - bottomCollisionTime
+            isWaitingToTurnRigidAtPiece -> currentTimeMs() - pieceCollisionTime
             else -> return 0f
         }
         val t = (elapsed / GameConstants.LOCK_DELAY_MS.toFloat()).coerceIn(0f, 1f)
@@ -243,14 +245,14 @@ internal class GameEngine(
                 if (bottomContacts > 0) {
                     if (!isWaitingToTurnRigidAtBottom) {
                         isWaitingToTurnRigidAtBottom = true
-                        bottomCollisionTime = System.currentTimeMillis()
+                        bottomCollisionTime = currentTimeMs()
                         springForceX = 0f
                     }
                 } else { isWaitingToTurnRigidAtBottom = false }
                 if (pieceContacts > 0) {
                     if (!isWaitingToTurnRigidAtPiece) {
                         isWaitingToTurnRigidAtPiece = true
-                        pieceCollisionTime = System.currentTimeMillis()
+                        pieceCollisionTime = currentTimeMs()
                         springForceX = 0f
                     }
                 } else { isWaitingToTurnRigidAtPiece = false }
@@ -262,14 +264,14 @@ internal class GameEngine(
                 if (bottomContacts > 0) {
                     if (!isWaitingToTurnRigidAtBottom) {
                         isWaitingToTurnRigidAtBottom = true
-                        bottomCollisionTime = System.currentTimeMillis()
+                        bottomCollisionTime = currentTimeMs()
                         springForceX = 0f
                     }
                 } else { isWaitingToTurnRigidAtBottom = false }
                 if (pieceContacts > 0) {
                     if (!isWaitingToTurnRigidAtPiece) {
                         isWaitingToTurnRigidAtPiece = true
-                        pieceCollisionTime = System.currentTimeMillis()
+                        pieceCollisionTime = currentTimeMs()
                         springForceX = 0f
                     }
                 } else { isWaitingToTurnRigidAtPiece = false }
@@ -533,7 +535,8 @@ internal class GameEngine(
         if (count == 0) return
 
         pieceX += (totalDx / count) * strength
-        pieceY += (totalDy / count) * strength
+        // Y is intentionally not animated: moving pieceY breaks the floor/piece contact
+        // that the lock timer depends on, causing the timer to reset indefinitely.
         pieceRotation = lerpAngleDeg(pieceRotation, snappedRotation, strength)
     }
 
