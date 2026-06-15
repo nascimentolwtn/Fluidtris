@@ -47,6 +47,11 @@ internal class GameEngine(
     private var slideDirection = 0f
     private var bounceCount = 0
 
+    private var isSnapAnimating = false
+    private var snapTargetX = 0f
+    private var snapTargetY = 0f
+    private var snapTargetRotation = 0f
+
     fun update(viewWidth: Int, viewHeight: Int) {
         if (viewWidth == 0 || viewHeight == 0) return
         if (!isPaused && !isGameOver) {
@@ -63,13 +68,13 @@ internal class GameEngine(
             keepPiecesInsideWalls(viewWidth)
             checkCollisions(viewWidth, viewHeight)
 
-            if (!isDragging && (isWaitingToTurnRigidAtBottom || isWaitingToTurnRigidAtPiece)) {
+            if (!isDragging && isSnapAnimating && (isWaitingToTurnRigidAtBottom || isWaitingToTurnRigidAtPiece)) {
                 val elapsed = when {
                     isWaitingToTurnRigidAtBottom -> currentTimeMs() - bottomCollisionTime
                     else                         -> currentTimeMs() - pieceCollisionTime
                 }
                 val t = (elapsed / GameConstants.LOCK_DELAY_MS.toFloat()).coerceIn(0f, 1f)
-                applySnapPull(viewWidth, viewHeight, t * t * GameConstants.SNAP_PULL_SPEED)
+                applySnapPull(t)
             }
 
             var didSolidify = false
@@ -119,6 +124,7 @@ internal class GameEngine(
         isSlidingOnContact = false
         slideDirection = 0f
         bounceCount = 0
+        isSnapAnimating = false
 
         currentPiece = Random.nextInt(GameConstants.PIECES.size)
         currentPieceColor = GameConstants.PIECE_COLORS[currentPiece]
@@ -239,7 +245,8 @@ internal class GameEngine(
 
         when {
             bounceCount >= 4 && totalContacts >= 1 -> {
-                // Exhausted bounces — force-lock as safety net.
+                // Exhausted bounces — force-lock as safety net; cancel any snap animation.
+                isSnapAnimating = false
                 isSlidingOnContact = false
                 slideDirection = 0f
                 if (bottomContacts > 0) {
@@ -266,6 +273,7 @@ internal class GameEngine(
                         isWaitingToTurnRigidAtBottom = true
                         bottomCollisionTime = currentTimeMs()
                         springForceX = 0f
+                        if (!isSnapAnimating) beginSnapAnimation(viewWidth, viewHeight)
                     }
                 } else { isWaitingToTurnRigidAtBottom = false }
                 if (pieceContacts > 0) {
@@ -273,31 +281,41 @@ internal class GameEngine(
                         isWaitingToTurnRigidAtPiece = true
                         pieceCollisionTime = currentTimeMs()
                         springForceX = 0f
+                        if (!isSnapAnimating) beginSnapAnimation(viewWidth, viewHeight)
                     }
                 } else { isWaitingToTurnRigidAtPiece = false }
             }
             totalContacts >= 1 -> {
-                // Contact but position not yet clean — bounce to find a valid resting spot.
-                isWaitingToTurnRigidAtBottom = false
-                isWaitingToTurnRigidAtPiece = false
-                if (!isSlidingOnContact) {
-                    bounceCount++
-                    val force = computeSlideForceX(viewHeight, cellWidth, cellHeight)
-                    slideDirection = if (force >= 0f) 1f else -1f
-                    springForceX = slideDirection * GameConstants.SLIDE_IMPULSE
-                    pieceY -= GameConstants.SLIDE_IMPULSE
-                    pieceRotation += slideDirection * GameConstants.BOUNCE_ROTATION_DEG
-                    isSlidingOnContact = true
-                } else {
-                    springForceX = 0f
+                // Contact but position not yet clean.
+                // During snap animation the piece is in transit — let it continue, no bounce.
+                if (!isSnapAnimating) {
+                    isWaitingToTurnRigidAtBottom = false
+                    isWaitingToTurnRigidAtPiece = false
+                    if (!isSlidingOnContact) {
+                        bounceCount++
+                        val force = computeSlideForceX(viewHeight, cellWidth, cellHeight)
+                        slideDirection = if (force >= 0f) 1f else -1f
+                        springForceX = slideDirection * GameConstants.SLIDE_IMPULSE
+                        pieceY -= GameConstants.SLIDE_IMPULSE
+                        pieceRotation += slideDirection * GameConstants.BOUNCE_ROTATION_DEG
+                        isSlidingOnContact = true
+                    } else {
+                        springForceX = 0f
+                    }
                 }
             }
             else -> {
                 isSlidingOnContact = false
                 slideDirection = 0f
-                bounceCount = 0
-                isWaitingToTurnRigidAtBottom = false
-                isWaitingToTurnRigidAtPiece = false
+                // If snap animation is running and the user is NOT dragging, the piece is in
+                // transit (e.g. moving upward toward its grid target) — keep the timer running.
+                // If the user IS dragging to open space, cancel snap and let the piece go fluid.
+                if (!isSnapAnimating || isDragging) {
+                    bounceCount = 0
+                    isWaitingToTurnRigidAtBottom = false
+                    isWaitingToTurnRigidAtPiece = false
+                    isSnapAnimating = false
+                }
             }
         }
     }
@@ -379,6 +397,7 @@ internal class GameEngine(
         isSlidingOnContact = false
         slideDirection = 0f
         bounceCount = 0
+        isSnapAnimating = false
 
         if (grid[0].any { it != null }) {
             isGameOver = true
@@ -515,15 +534,15 @@ internal class GameEngine(
         return if (contactCenterX > pieceCenterX) -GameConstants.SLIDE_IMPULSE else GameConstants.SLIDE_IMPULSE
     }
 
-    private fun applySnapPull(viewWidth: Int, viewHeight: Int, strength: Float) {
+    private fun beginSnapAnimation(viewWidth: Int, viewHeight: Int) {
         val cellWidth  = (viewWidth  - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN)  / GameConstants.GRID_COLUMNS
         val cellHeight = (viewHeight - GameConstants.GRID_TOP  - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
 
         var normalized = pieceRotation % 360f
         if (normalized < 0f) normalized += 360f
-        val snappedRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
+        snapTargetRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
 
-        val centers = rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, snappedRotation)
+        val centers = rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, snapTargetRotation)
         var totalDx = 0f; var totalDy = 0f; var count = 0
         for ((bx, by) in centers) {
             val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt().coerceIn(0, GameConstants.GRID_COLUMNS - 1)
@@ -532,12 +551,23 @@ internal class GameEngine(
             totalDy += GameConstants.GRID_TOP  + (gy + 0.5f) * cellHeight - by
             count++
         }
-        if (count == 0) return
+        if (count > 0) {
+            snapTargetX = pieceX + totalDx / count
+            snapTargetY = pieceY + totalDy / count
+        } else {
+            snapTargetX = pieceX
+            snapTargetY = pieceY
+        }
+        bounceCount = 0
+        isSnapAnimating = true
+    }
 
-        pieceX += (totalDx / count) * strength
-        // Y is intentionally not animated: moving pieceY breaks the floor/piece contact
-        // that the lock timer depends on, causing the timer to reset indefinitely.
-        pieceRotation = lerpAngleDeg(pieceRotation, snappedRotation, strength)
+    private fun applySnapPull(t: Float) {
+        val xStrength   = t * GameConstants.SNAP_PULL_SPEED
+        val rotStrength = t * GameConstants.SNAP_ROTATION_SPEED
+        pieceX        += (snapTargetX - pieceX) * xStrength
+        pieceY        += (snapTargetY - pieceY) * xStrength
+        pieceRotation  = lerpAngleDeg(pieceRotation, snapTargetRotation, rotStrength)
     }
 
     private fun moveUpUntilClear(viewWidth: Int, viewHeight: Int) {
