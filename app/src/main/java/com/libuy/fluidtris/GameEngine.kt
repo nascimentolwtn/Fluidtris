@@ -227,8 +227,8 @@ internal class GameEngine(
         val totalContacts  = bottomContacts + pieceContacts
 
         when {
-            totalContacts >= 2 || (bounceCount >= 4 && totalContacts >= 1) -> {
-                // Normal 2+ contacts OR piece exhausted 4 bounces without escaping → solidify.
+            bounceCount >= 4 && totalContacts >= 1 -> {
+                // Exhausted bounces — force-lock as safety net.
                 isSlidingOnContact = false
                 slideDirection = 0f
                 if (bottomContacts > 0) {
@@ -237,44 +237,51 @@ internal class GameEngine(
                         bottomCollisionTime = System.currentTimeMillis()
                         springForceX = 0f
                     }
-                } else {
-                    isWaitingToTurnRigidAtBottom = false
-                }
+                } else { isWaitingToTurnRigidAtBottom = false }
                 if (pieceContacts > 0) {
                     if (!isWaitingToTurnRigidAtPiece) {
                         isWaitingToTurnRigidAtPiece = true
                         pieceCollisionTime = System.currentTimeMillis()
                         springForceX = 0f
                     }
-                } else {
-                    isWaitingToTurnRigidAtPiece = false
-                }
+                } else { isWaitingToTurnRigidAtPiece = false }
             }
-            totalContacts == 1 -> {
-                isWaitingToTurnRigidAtBottom = false
-                isWaitingToTurnRigidAtPiece = false
-                if (pieceContacts > 0) {
-                    if (!isSlidingOnContact) {
-                        // First frame of this contact: one-time lateral + vertical push, plus tilt.
-                        bounceCount++
-                        val force = computeSlideForceX(viewHeight, cellWidth, cellHeight)
-                        slideDirection = if (force >= 0f) 1f else -1f
-                        springForceX = slideDirection * GameConstants.SLIDE_IMPULSE
-                        pieceY -= GameConstants.SLIDE_IMPULSE
-                        pieceRotation += slideDirection * GameConstants.BOUNCE_ROTATION_DEG
-                        isSlidingOnContact = true
-                    } else {
+            totalContacts >= 1 && canLockCleanly(viewWidth, viewHeight) -> {
+                // Piece is resting cleanly on valid empty cells — start lock timer.
+                isSlidingOnContact = false
+                slideDirection = 0f
+                if (bottomContacts > 0) {
+                    if (!isWaitingToTurnRigidAtBottom) {
+                        isWaitingToTurnRigidAtBottom = true
+                        bottomCollisionTime = System.currentTimeMillis()
                         springForceX = 0f
                     }
+                } else { isWaitingToTurnRigidAtBottom = false }
+                if (pieceContacts > 0) {
+                    if (!isWaitingToTurnRigidAtPiece) {
+                        isWaitingToTurnRigidAtPiece = true
+                        pieceCollisionTime = System.currentTimeMillis()
+                        springForceX = 0f
+                    }
+                } else { isWaitingToTurnRigidAtPiece = false }
+            }
+            totalContacts >= 1 -> {
+                // Contact but position not yet clean — bounce to find a valid resting spot.
+                isWaitingToTurnRigidAtBottom = false
+                isWaitingToTurnRigidAtPiece = false
+                if (!isSlidingOnContact) {
+                    bounceCount++
+                    val force = computeSlideForceX(viewHeight, cellWidth, cellHeight)
+                    slideDirection = if (force >= 0f) 1f else -1f
+                    springForceX = slideDirection * GameConstants.SLIDE_IMPULSE
+                    pieceY -= GameConstants.SLIDE_IMPULSE
+                    pieceRotation += slideDirection * GameConstants.BOUNCE_ROTATION_DEG
+                    isSlidingOnContact = true
                 } else {
-                    // Piece cleared the placed block — stop everything, allow fresh contact.
-                    isSlidingOnContact = false
-                    slideDirection = 0f
                     springForceX = 0f
                 }
             }
             else -> {
-                // 0 contacts: piece is fully clear — reset bounce counter and state.
                 isSlidingOnContact = false
                 slideDirection = 0f
                 bounceCount = 0
@@ -282,6 +289,30 @@ internal class GameEngine(
                 isWaitingToTurnRigidAtPiece = false
             }
         }
+    }
+
+    private fun canLockCleanly(viewWidth: Int, viewHeight: Int): Boolean {
+        val cellWidth = (viewWidth - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
+        val cellHeight = (viewHeight - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
+        val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
+
+        var normalized = pieceRotation % 360f
+        if (normalized < 0f) normalized += 360f
+        val snappedRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
+
+        val centers = rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, snappedRotation)
+        var resting = false
+        for ((bx, by) in centers) {
+            val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
+            val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
+            if (gx !in 0 until GameConstants.GRID_COLUMNS || gy !in 0 until GameConstants.GRID_ROWS) return false
+            if (grid[gy][gx] != null) return false
+            // Resting: at the floor, would overflow grid bottom, or solid cell directly below.
+            if (by + GameConstants.PIECE_SIZE / 2f >= gridBottom) resting = true
+            else if (gy + 1 >= GameConstants.GRID_ROWS) resting = true
+            else if (grid[gy + 1][gx] != null) resting = true
+        }
+        return resting
     }
 
     internal fun turnPieceRigid(viewWidth: Int, viewHeight: Int) {
