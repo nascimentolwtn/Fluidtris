@@ -172,6 +172,16 @@ class FluidTetrisView @JvmOverloads constructor(
             paint.color = Color.argb(255, 120, 200, 220)
             canvas.drawText("Score: ${engine.score}", width / 2 - 250f, height / 2 + 80f, paint)
             canvas.drawText("High Score: ${engine.highScore}", width / 2 - 250f, height / 2 + 150f, paint)
+
+            val buttonWidth = 400f
+            val buttonHeight = 120f
+            val buttonX = (width - buttonWidth) / 2
+            val buttonY = height / 2 + 260f
+            paint.color = Color.argb(220, 80, 180, 150)
+            canvas.drawRect(buttonX, buttonY, buttonX + buttonWidth, buttonY + buttonHeight, paint)
+            paint.color = Color.argb(255, 255, 255, 255)
+            paint.textSize = 60f
+            canvas.drawText("New Game", buttonX + 50f, buttonY + 85f, paint)
         }
 
         if (engine.isPaused && !engine.isGameOver) {
@@ -186,6 +196,18 @@ class FluidTetrisView @JvmOverloads constructor(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                if (engine.isGameOver) {
+                    val buttonWidth = 400f
+                    val buttonHeight = 120f
+                    val buttonX = (width - buttonWidth) / 2
+                    val buttonY = height / 2 + 260f
+                    if (event.x in buttonX..(buttonX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
+                        engine.resetGame(width, height)
+                        invalidate()
+                        return true
+                    }
+                    return true
+                }
                 if (!engine.isPaused && engine.onTouchDown(event.x, event.y)) {
                     return true
                 }

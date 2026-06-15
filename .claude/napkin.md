@@ -40,7 +40,8 @@
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
 ## Backlog
-1. **[feature] Ask player name when hitting new highscore** — show Android `AlertDialog` with `EditText` when `onHighScoreBeat` fires in FluidTetrisView; save name alongside score in SharedPreferences via new `HighScoreManager.saveHighScoreName()` method.
+1. **[2026-06-15] [feature] Show "New Game" button on gameover** — when game ends, display a large "New Game" button below the scores. Tapping it resets the game and starts a new round.
+2. **[feature] Ask player name when hitting new highscore** — show Android `AlertDialog` with `EditText` when `onHighScoreBeat` fires in FluidTetrisView; save name alongside score in SharedPreferences via new `HighScoreManager.saveHighScoreName()` method.
 
 ## Done
 - **[2026-06-04] Fix: piece overwrites another piece when locked with rotation** — two bugs: (1) `doesPieceCollideWithGridAtY` ignored actual `by` from `rotatedBlockCenters`, using `testY+50f` for all blocks; (2) `turnPieceRigid` snaps rotation before writing to grid but never re-checked for overlap in the snapped shape. Fix: corrected `doesPieceCollideWithGridAtY` to use real `by`, added post-snap overlap-clearing loop in `turnPieceRigid` using the same coord formula as the grid write. 1 regression test added. 86 tests pass.
