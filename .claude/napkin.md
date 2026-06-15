@@ -46,10 +46,13 @@
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
 ## Backlog
-1. **[2026-06-15] Feature: slide while animating when no collision**
+1. **[2026-06-15] Feature: Level display and level-up sound**
+   Do instead: add "Level X" label near the score display (starts at 1). Level increases every 1000 points (level = score / 1000 + 1). When level increases, play a distinct sound (separate from lock/line-clear sounds). Add new sound file `level_up_sound.ogg` to `res/raw/` and wire to `SoundManager.kt` with `playLevelUpSound()` method called in `GameEngine.checkLines()` after updating score.
+
+2. **[2026-06-15] Feature: slide while animating when no collision**
    Do instead: during snap animation (lock countdown), allow piece to slide horizontally if there is no block/wall collision ahead. Currently snap animation is rigid; allow user input to push the piece left/right during the countdown if the target position remains open.
 
-2. **[2026-06-15] Feature: add ads**
+3. **[2026-06-15] Feature: add ads**
    Do instead: integrate ad framework (Google Mobile Ads SDK). Show ads at three points: (a) mid-game banner/interstitial, (b) during pause menu, (c) during game-over screen. Define placement strategy and frequency.
 
 ## Done
