@@ -57,7 +57,8 @@ internal class GameEngine(
         if (viewWidth == 0 || viewHeight == 0) return
         if (!isPaused && !isGameOver) {
             if (!isWaitingToTurnRigidAtBottom && !isWaitingToTurnRigidAtPiece && !isDragging) {
-                pieceY += GameConstants.GRAVITY
+                val scaledGravity = GameConstants.GRAVITY * (1 + score / 1000 * 0.5f).coerceAtMost(3f)
+                pieceY += scaledGravity
             }
 
             if (!isDragging && springForceX != 0f) {
