@@ -8,6 +8,10 @@ internal class SoundManager(private val context: Context) {
     private var currentMediaPlayer: MediaPlayer? = null
     private val soundQueue = mutableListOf<Int>()
 
+    var bgMusicEnabled = true
+    private var bgMusicPlayer: MediaPlayer? = null
+    private var bgMusicPaused = false
+
     fun playMove() {
         if (enabled) queueSound(R.raw.move_sound)
     }
@@ -50,5 +54,37 @@ internal class SoundManager(private val context: Context) {
             currentMediaPlayer = null
             playNextInQueue()
         }
+    }
+
+    fun startBgMusic(context: Context) {
+        stopBgMusic()
+        if (!bgMusicEnabled) return
+        bgMusicPlayer = MediaPlayer.create(context, R.raw.bg_music)?.apply {
+            isLooping = true
+            start()
+        }
+        bgMusicPaused = false
+    }
+
+    fun pauseBgMusic() {
+        bgMusicPlayer?.takeIf { it.isPlaying }?.pause()
+        bgMusicPaused = true
+    }
+
+    fun resumeBgMusic() {
+        if (!bgMusicEnabled || !bgMusicPaused) return
+        bgMusicPlayer?.start()
+        bgMusicPaused = false
+    }
+
+    fun stopBgMusic() {
+        bgMusicPlayer?.apply { stop(); release() }
+        bgMusicPlayer = null
+        bgMusicPaused = false
+    }
+
+    fun toggleBgMusic(context: Context) {
+        bgMusicEnabled = !bgMusicEnabled
+        if (bgMusicEnabled) startBgMusic(context) else pauseBgMusic()
     }
 }

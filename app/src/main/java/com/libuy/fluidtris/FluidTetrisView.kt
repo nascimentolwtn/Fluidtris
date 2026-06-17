@@ -56,6 +56,7 @@ class FluidTetrisView @JvmOverloads constructor(
     init {
         engine.highScore = highScoreManager.loadHighScore()
         handler.post(updateRunnable)
+        soundManager.startBgMusic(context)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldW: Int, oldH: Int) {
@@ -175,6 +176,14 @@ class FluidTetrisView @JvmOverloads constructor(
         val soundText = if (soundManager.enabled) "🔊" else "🔇"
         canvas.drawText(soundText, 110f, 235f, paint)
 
+        // BG music toggle button
+        paint.color = Color.argb(200, 80, 120, 150)
+        canvas.drawRect(10f, 280f, 280f, 380f, paint)
+        paint.color = Color.argb(255, 200, 240, 230)
+        paint.textSize = 48f
+        val bgText = if (soundManager.bgMusicEnabled) "🎵" else "🎵🔇"
+        canvas.drawText(bgText, 100f, 345f, paint)
+
         paint.color = Color.argb(200, 50, 150, 130)
         canvas.drawRect(20f, height - 150f, 200f, height - 50f, paint)
         paint.color = Color.argb(255, 200, 240, 230)
@@ -269,6 +278,14 @@ class FluidTetrisView @JvmOverloads constructor(
             paint.textSize = 48f
             val soundText = if (soundManager.enabled) "🔊" else "🔇"
             canvas.drawText(soundText, 110f, 235f, paint)
+
+            // BG music toggle button (pause overlay)
+            paint.color = Color.argb(200, 80, 120, 150)
+            canvas.drawRect(10f, 280f, 280f, 380f, paint)
+            paint.color = Color.argb(255, 200, 240, 230)
+            paint.textSize = 48f
+            val bgText = if (soundManager.bgMusicEnabled) "🎵" else "🎵🔇"
+            canvas.drawText(bgText, 100f, 345f, paint)
         }
     }
 
@@ -277,6 +294,11 @@ class FluidTetrisView @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 if (event.x in 10f..280f && event.y in 170f..270f) {
                     soundManager.enabled = !soundManager.enabled
+                    invalidate()
+                    return true
+                }
+                if (event.x in 10f..280f && event.y in 280f..380f) {
+                    soundManager.toggleBgMusic(context)
                     invalidate()
                     return true
                 }
@@ -290,10 +312,12 @@ class FluidTetrisView @JvmOverloads constructor(
 
                     if (event.x in newGameX..(newGameX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
                         engine.resetGame(width, height)
+                        soundManager.startBgMusic(context)
                         invalidate()
                         return true
                     }
                     if (event.x in exitX..(exitX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
+                        soundManager.stopBgMusic()
                         gameListener?.onExitPressed()
                         return true
                     }
@@ -312,15 +336,18 @@ class FluidTetrisView @JvmOverloads constructor(
 
                     if (event.x in newGameX..(newGameX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
                         engine.resetGame(width, height)
+                        soundManager.startBgMusic(context)
                         invalidate()
                         return true
                     }
                     if (event.x in resumeX..(resumeX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
                         engine.resume()
+                        soundManager.resumeBgMusic()
                         invalidate()
                         return true
                     }
                     if (event.x in exitX..(exitX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
+                        soundManager.stopBgMusic()
                         gameListener?.onExitPressed()
                         return true
                     }
@@ -331,14 +358,17 @@ class FluidTetrisView @JvmOverloads constructor(
                 }
                 if (event.x in 20f..200f && event.y in (height - 150f)..(height - 50f)) {
                     engine.resetGame(width, height)
+                    soundManager.startBgMusic(context)
                     invalidate()
                     return true
                 }
                 if (event.x in (width / 2 - 100f)..(width / 2 + 100f) && event.y in (height - 150f)..(height - 50f)) {
                     engine.togglePause()
+                    if (engine.isPaused) soundManager.pauseBgMusic() else soundManager.resumeBgMusic()
                     return true
                 }
                 if (event.x in (width - 200f)..(width - 20f) && event.y in (height - 150f)..(height - 50f)) {
+                    soundManager.stopBgMusic()
                     gameListener?.onExitPressed()
                     return true
                 }
@@ -378,6 +408,11 @@ class FluidTetrisView @JvmOverloads constructor(
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         if (!hasWindowFocus) engine.onFocusLost() else engine.onFocusGained()
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        soundManager.stopBgMusic()
     }
 
     private fun drawJellyPiece(
