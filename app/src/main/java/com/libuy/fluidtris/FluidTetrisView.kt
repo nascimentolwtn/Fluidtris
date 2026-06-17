@@ -21,7 +21,7 @@ class FluidTetrisView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     companion object {
-        private const val NEXT_BUTTON_SQUARED_SIZE = 160f
+        private const val NEXT_BUTTON_SQUARED_SIZE = 180f
         private const val GAME_LOOP_INTERVAL_MS = 16L
     }
 

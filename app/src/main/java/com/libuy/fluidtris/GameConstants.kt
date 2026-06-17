@@ -17,7 +17,7 @@ internal object GameConstants {
     const val SNAP_ROTATION_SPEED = 0.96f  // rotation: per-frame lerp strength at t=1 (linear ramp)
     const val LEVEL_DIFFICULTY_FACTOR = 0.3f // multiplier increase per level
     const val MAX_LEVEL_MULTIPLIER = 3f      // cap on level multiplier
-    const val NEXT_LEVEL_SCORE = 200 // score points needed per level (default: 1000)
+    const val NEXT_LEVEL_SCORE = 300 // score points needed per level (default: 500)
     const val GRID_LEFT = 150f
     const val GRID_TOP = 100f
     const val GRID_RIGHT_MARGIN = 150f
@@ -37,7 +37,7 @@ internal object GameConstants {
         0xFF00FFFF.toInt(), // I – cyan
         0xFFFFFF00.toInt(), // O – yellow
         0xFFFF00FF.toInt(), // T – magenta
-        0xFFFF0000.toInt(), // L – red
+        0xBBBBBBBB.toInt(), // L – light-gray
         0xFF0000FF.toInt(), // J – blue
         0xFF00FF00.toInt(), // S – green
         0xFFFF0000.toInt()  // Z – red
