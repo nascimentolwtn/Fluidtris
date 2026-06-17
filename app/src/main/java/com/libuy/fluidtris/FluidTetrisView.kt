@@ -38,7 +38,8 @@ class FluidTetrisView @JvmOverloads constructor(
     private val engine = GameEngine(
         onPieceLocked = { soundManager.playRigid() },
         onLineCleared = { soundManager.playMove() },
-        onHighScoreBeat = { newScore -> highScoreManager.saveHighScore(newScore) }
+        onHighScoreBeat = { newScore -> highScoreManager.saveHighScore(newScore) },
+        onLevelUp = { soundManager.playLevelUpSound() }
     )
     private var pendingNameDialog = false
 
@@ -152,18 +153,21 @@ class FluidTetrisView @JvmOverloads constructor(
         canvas.restore()
 
         paint.color = Color.argb(180, 20, 60, 100)
-        canvas.drawRect(10f, 5f, 400f, 95f, paint)
-        paint.color = Color.argb(255, 100, 220, 200)
+        canvas.drawRect(10f, 5f, 400f, 155f, paint)
         paint.textSize = 40f
+        paint.color = Color.argb(255, 100, 220, 200)
         canvas.drawText("Score: ${engine.score}", 20f, 40f, paint)
+        paint.color = if (engine.isBeatingHighScore) Color.YELLOW else Color.argb(255, 100, 220, 200)
         canvas.drawText("High Score: ${engine.highScore}", 20f, 80f, paint)
+        paint.color = Color.argb(255, 100, 220, 200)
+        canvas.drawText("Level: ${engine.getLevel()}", 20f, 140f, paint)
 
         paint.color = Color.argb(200, 80, 120, 150)
-        canvas.drawRect(10f, 100f, 280f, 200f, paint)
+        canvas.drawRect(10f, 170f, 280f, 270f, paint)
         paint.color = Color.argb(255, 200, 240, 230)
         paint.textSize = 48f
         val soundText = if (soundManager.enabled) "🔊" else "🔇"
-        canvas.drawText(soundText, 110f, 165f, paint)
+        canvas.drawText(soundText, 110f, 235f, paint)
 
         paint.color = Color.argb(200, 50, 150, 130)
         canvas.drawRect(20f, height - 150f, 200f, height - 50f, paint)
@@ -257,7 +261,7 @@ class FluidTetrisView @JvmOverloads constructor(
                 if (!engine.isPaused && engine.onTouchDown(event.x, event.y)) {
                     return true
                 }
-                if (event.x in 10f..280f && event.y in 100f..200f) {
+                if (event.x in 10f..280f && event.y in 170f..270f) {
                     soundManager.enabled = !soundManager.enabled
                     invalidate()
                     return true
