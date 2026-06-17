@@ -46,6 +46,8 @@
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
 ## Backlog
+1. **[2026-06-17] Refactor: migrate build to AGP 10.0 compatibility (resolve deprecation warnings)**
+   Do instead: migrate `android.builtInKotlin` and `android.newDsl` settings, remove legacy variant API usage. Eliminates 5 Gradle deprecation warnings about APIs being removed in AGP 10.0. No functional impact; tests pass with current build. See `.claude/plans/build-migration.md` for step-by-step plan.
 2. **[2026-06-15] Feature: slide while animating when no collision**
    Do instead: during snap animation (lock countdown), allow piece to slide horizontally if there is no block/wall collision ahead. Currently snap animation is rigid; allow user input to push the piece left/right during the countdown if the target position remains open.
 3. **[2026-06-15] Feature: add ads**
