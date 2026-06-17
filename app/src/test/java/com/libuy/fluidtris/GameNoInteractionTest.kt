@@ -114,6 +114,50 @@ class GameNoInteractionTest {
         assertTrue("Game should end because top row filled", e.grid[0].any { it != null })
     }
 
+    @Test
+    fun withNextButton_otherPieceEventuallyLocksIntoGrid() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+
+        e.onNextPieceButton(VW, VH)
+        val initialGridCount = e.grid.sumOf { row -> row.count { it != null } }
+
+        val maxIterations = 20_000
+        var iterations = 0
+        while (iterations < maxIterations) {
+            fakeTimeMs += 16L
+            e.update(VW, VH)
+            iterations++
+            val gridCount = e.grid.sumOf { row -> row.count { it != null } }
+            if (gridCount > initialGridCount) break
+        }
+
+        val finalGridCount = e.grid.sumOf { row -> row.count { it != null } }
+        assertTrue("Other falling piece should have locked into grid (got $finalGridCount blocks)", finalGridCount > initialGridCount)
+    }
+
+    @Test
+    fun withNextButton_gameEventuallyReachesGameOver() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+
+        e.onNextPieceButton(VW, VH)
+
+        val maxIterations = 200_000
+        var iterations = 0
+        while (!e.isGameOver && iterations < maxIterations) {
+            fakeTimeMs += 16L
+            e.update(VW, VH)
+            iterations++
+        }
+
+        assertTrue("Game should reach game over even with Next button used (ran $iterations iterations)", e.isGameOver)
+    }
+
     private fun verifyGridIntegrity(e: GameEngine, cellWidth: Float, cellHeight: Float) {
         // Count total blocks
         val blockCount = e.grid.sumOf { row -> row.count { it != null } }

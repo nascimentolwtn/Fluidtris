@@ -117,6 +117,27 @@ class NextPieceButtonTest {
     }
 
     @Test
+    fun touchOnOtherFallingPiece_canDragIt() {
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.resetGame(VW, VH)
+
+        // Use O-piece (2x2 fully filled) at a known position, then press Next
+        e.currentPiece = 1  // O-piece
+        e.pieceX = 300f
+        e.pieceY = 600f
+        e.onNextPieceButton(VW, VH)
+
+        // fallingPieces[1] is the old O-piece at (300, 600)
+        // Touch dead center of the O-piece (all cells filled, guaranteed hit)
+        val touchX = 300f + 2 * GameConstants.PIECE_SIZE / 2f  // 400f
+        val touchY = 600f + 2 * GameConstants.PIECE_SIZE / 2f  // 700f
+
+        val hit = e.onTouchDown(touchX, touchY)
+        assertTrue("Should register a hit on the other falling piece", hit)
+        assertTrue("Should be dragging after hitting another piece", e.isDragging)
+    }
+
+    @Test
     fun nextButton_bounds_calculation_matches_preview() {
         val VW = 1080
         val previewBoxSize = 160f

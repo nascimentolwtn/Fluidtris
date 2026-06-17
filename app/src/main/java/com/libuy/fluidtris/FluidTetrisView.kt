@@ -116,34 +116,21 @@ class FluidTetrisView @JvmOverloads constructor(
             }
         }
 
-        val currentPieceShape = GameConstants.PIECES[engine.currentPiece]
         val pieceSize = GameConstants.PIECE_SIZE
 
-        val solidity = engine.getCollisionSolidity()
-        val fluidBlockSize = pieceSize - (1f - solidity) * 4f
-        val drawOffsetX = currentPieceShape[0].size * (pieceSize - fluidBlockSize) / 2f
-        val drawOffsetY = currentPieceShape.size * (pieceSize - fluidBlockSize) / 2f
-        canvas.save()
-        canvas.rotate(engine.pieceRotation,
-            engine.pieceX + (currentPieceShape[0].size * pieceSize) / 2,
-            engine.pieceY + (currentPieceShape.size * pieceSize) / 2)
-        drawJellyPiece(canvas, currentPieceShape,
-            engine.pieceX + drawOffsetX, engine.pieceY + drawOffsetY,
-            engine.currentPieceColor, solidity, fluidBlockSize)
-        canvas.restore()
-
-        // Draw other falling pieces
-        for (otherPiece in engine.otherFallingPieces) {
-            val otherShape = GameConstants.PIECES[otherPiece.type]
-            val otherDrawOffsetX = otherShape[0].size * (pieceSize - fluidBlockSize) / 2f
-            val otherDrawOffsetY = otherShape.size * (pieceSize - fluidBlockSize) / 2f
+        for (piece in engine.fallingPieces) {
+            val shape = GameConstants.PIECES[piece.type]
+            val solidity = engine.getCollisionSolidity(piece)
+            val fluidBlockSize = pieceSize - (1f - solidity) * 4f
+            val drawOffsetX = shape[0].size * (pieceSize - fluidBlockSize) / 2f
+            val drawOffsetY = shape.size * (pieceSize - fluidBlockSize) / 2f
             canvas.save()
-            canvas.rotate(otherPiece.rotation,
-                otherPiece.x + (otherShape[0].size * pieceSize) / 2,
-                otherPiece.y + (otherShape.size * pieceSize) / 2)
-            drawJellyPiece(canvas, otherShape,
-                otherPiece.x + otherDrawOffsetX, otherPiece.y + otherDrawOffsetY,
-                otherPiece.color, 0f, fluidBlockSize)
+            canvas.rotate(piece.rotation,
+                piece.x + (shape[0].size * pieceSize) / 2,
+                piece.y + (shape.size * pieceSize) / 2)
+            drawJellyPiece(canvas, shape,
+                piece.x + drawOffsetX, piece.y + drawOffsetY,
+                piece.color, solidity, fluidBlockSize)
             canvas.restore()
         }
 

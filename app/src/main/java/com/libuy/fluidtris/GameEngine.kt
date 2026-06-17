@@ -4,12 +4,24 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
-data class FallingPiece(
+data class ActivePiece(
     var type: Int,
+    var color: Int,
     var x: Float,
     var y: Float,
     var rotation: Float,
-    var color: Int
+    var springForceX: Float = 0f,
+    var isSlidingOnContact: Boolean = false,
+    var slideDirection: Float = 0f,
+    var bounceCount: Int = 0,
+    var isWaitingToTurnRigidAtBottom: Boolean = false,
+    var isWaitingToTurnRigidAtPiece: Boolean = false,
+    var bottomCollisionTime: Long = 0L,
+    var pieceCollisionTime: Long = 0L,
+    var isSnapAnimating: Boolean = false,
+    var snapTargetX: Float = 0f,
+    var snapTargetY: Float = 0f,
+    var snapTargetRotation: Float = 0f
 )
 
 internal class GameEngine(
@@ -22,14 +34,10 @@ internal class GameEngine(
     var score = 0
     var highScore = 0
 
-    var pieceX = 0f
-    var pieceY = 0f
-    var pieceRotation = 0f
-    private var velocityY = 0f
+    val fallingPieces = mutableListOf<ActivePiece>()
+    var draggedPiece: ActivePiece? = null
 
-    private var springForceX = 0f
-
-    var isDragging = false
+    // Touch state for the actively dragged piece
     private var isDraggingCenter = false
     private var touchedBlockRow = 0
     private var touchedBlockCol = 0
@@ -37,92 +45,99 @@ internal class GameEngine(
     private var lastTouchY = 0f
 
     var isPaused = false
-    var isGameOver = true  // stays true until resetGame() is called with real dimensions
+    var isGameOver = true
     var wasManuallyPausedBeforeSystemPause = false
     var justBeatHighScore = false
     var isBeatingHighScore = false
 
-    var currentPiece = 0
-    var currentPieceColor = GameConstants.PIECE_COLORS[0]
     var nextPiece = 1
     var nextPieceColor = GameConstants.PIECE_COLORS[1]
     var nextPieceRotation = 0f
 
     internal var currentTimeMs: () -> Long = System::currentTimeMillis
 
-    private var bottomCollisionTime = 0L
-    private var pieceCollisionTime = 0L
-    private var isWaitingToTurnRigidAtBottom = false
-    private var isWaitingToTurnRigidAtPiece = false
-    private var isSlidingOnContact = false
-    private var slideDirection = 0f
-    private var bounceCount = 0
+    // ── Backward-compat properties (tests and FluidTetrisView use these) ──────
 
-    private var isSnapAnimating = false
-    private var snapTargetX = 0f
-    private var snapTargetY = 0f
-    private var snapTargetRotation = 0f
+    var pieceX: Float
+        get() = fallingPieces.firstOrNull()?.x ?: 0f
+        set(v) { fallingPieces.firstOrNull()?.x = v }
 
-    val otherFallingPieces = mutableListOf<FallingPiece>()
+    var pieceY: Float
+        get() = fallingPieces.firstOrNull()?.y ?: 0f
+        set(v) { fallingPieces.firstOrNull()?.y = v }
+
+    var pieceRotation: Float
+        get() = fallingPieces.firstOrNull()?.rotation ?: 0f
+        set(v) { fallingPieces.firstOrNull()?.rotation = v }
+
+    var currentPiece: Int
+        get() = fallingPieces.firstOrNull()?.type ?: 0
+        set(v) {
+            fallingPieces.firstOrNull()?.let {
+                it.type = v
+                it.color = GameConstants.PIECE_COLORS[v]
+            }
+        }
+
+    val currentPieceColor: Int get() = fallingPieces.firstOrNull()?.color ?: 0
+
+    var isDragging: Boolean
+        get() = draggedPiece != null
+        set(v) { draggedPiece = if (v) fallingPieces.firstOrNull() else null }
+
+    val otherFallingPieces: List<ActivePiece>
+        get() = if (fallingPieces.size > 1) fallingPieces.subList(1, fallingPieces.size) else emptyList()
+
+    // ── Update ────────────────────────────────────────────────────────────────
 
     fun update(viewWidth: Int, viewHeight: Int) {
         if (viewWidth == 0 || viewHeight == 0) return
-        if (!isPaused && !isGameOver) {
-            if (!isWaitingToTurnRigidAtBottom && !isWaitingToTurnRigidAtPiece && !isDragging) {
-                val scaledGravity = GameConstants.GRAVITY * getLevelMultiplier()
-                pieceY += scaledGravity
+        if (isPaused || isGameOver) return
+
+        val scaledGravity = GameConstants.GRAVITY * getLevelMultiplier()
+
+        for (piece in fallingPieces.toList()) {
+            if (isGameOver) break
+            if (!fallingPieces.contains(piece)) continue  // already locked this frame
+
+            val pieceIsDragging = draggedPiece === piece
+
+            if (!piece.isWaitingToTurnRigidAtBottom && !piece.isWaitingToTurnRigidAtPiece && !pieceIsDragging) {
+                piece.y += scaledGravity
             }
 
-            if (!isDragging && springForceX != 0f) {
-                pieceX += springForceX
-                springForceX *= GameConstants.SPRING_DAMPING
-                if (kotlin.math.abs(springForceX) < 0.1f) springForceX = 0f
+            if (!pieceIsDragging && piece.springForceX != 0f) {
+                piece.x += piece.springForceX
+                piece.springForceX *= GameConstants.SPRING_DAMPING
+                if (kotlin.math.abs(piece.springForceX) < 0.1f) piece.springForceX = 0f
             }
 
-            keepPiecesInsideWalls(viewWidth)
-            checkCollisions(viewWidth, viewHeight)
+            keepPieceInsideWalls(piece, viewWidth)
+            checkPieceCollisions(piece, pieceIsDragging, viewWidth, viewHeight)
 
-            // Update other falling pieces with gravity
-            val scaledGravity = GameConstants.GRAVITY * getLevelMultiplier()
-            for (otherPiece in otherFallingPieces) {
-                otherPiece.y += scaledGravity
-                // Clamp other pieces inside walls
-                val otherCenters = rotatedBlockCenters(GameConstants.PIECES[otherPiece.type], otherPiece.x, otherPiece.y, otherPiece.rotation)
-                otherPiece.x = clampPieceXByCenters(
-                    otherCenters, otherPiece.x,
-                    GameConstants.GRID_LEFT,
-                    viewWidth - GameConstants.GRID_RIGHT_MARGIN,
-                    GameConstants.PIECE_SIZE / 2
-                )
-            }
-
-            if (!isDragging && isSnapAnimating && (isWaitingToTurnRigidAtBottom || isWaitingToTurnRigidAtPiece)) {
+            if (!pieceIsDragging && piece.isSnapAnimating &&
+                (piece.isWaitingToTurnRigidAtBottom || piece.isWaitingToTurnRigidAtPiece)) {
                 val elapsed = when {
-                    isWaitingToTurnRigidAtBottom -> currentTimeMs() - bottomCollisionTime
-                    else                         -> currentTimeMs() - pieceCollisionTime
+                    piece.isWaitingToTurnRigidAtBottom -> currentTimeMs() - piece.bottomCollisionTime
+                    else -> currentTimeMs() - piece.pieceCollisionTime
                 }
                 val t = (elapsed / GameConstants.LOCK_DELAY_MS.toFloat()).coerceIn(0f, 1f)
-                applySnapPull(t)
+                applySnapPull(piece, t)
             }
 
             var didSolidify = false
-
-            if (isWaitingToTurnRigidAtBottom) {
-                if (currentTimeMs() - bottomCollisionTime >= GameConstants.LOCK_DELAY_MS) {
-                    isDragging = false
-                    turnPieceRigid(viewWidth, viewHeight)
-                    isWaitingToTurnRigidAtBottom = false
-                    isWaitingToTurnRigidAtPiece = false
+            if (piece.isWaitingToTurnRigidAtBottom) {
+                if (currentTimeMs() - piece.bottomCollisionTime >= GameConstants.LOCK_DELAY_MS) {
+                    if (draggedPiece === piece) draggedPiece = null
+                    turnPieceRigidInternal(piece, viewWidth, viewHeight)
                     didSolidify = true
                 }
             }
-
-            if (!didSolidify && isWaitingToTurnRigidAtPiece) {
-                if (currentTimeMs() - pieceCollisionTime >= GameConstants.LOCK_DELAY_MS) {
-                    isDragging = false
-                    moveUpUntilClear(viewWidth, viewHeight)
-                    turnPieceRigid(viewWidth, viewHeight)
-                    isWaitingToTurnRigidAtPiece = false
+            if (!didSolidify && piece.isWaitingToTurnRigidAtPiece) {
+                if (currentTimeMs() - piece.pieceCollisionTime >= GameConstants.LOCK_DELAY_MS) {
+                    if (draggedPiece === piece) draggedPiece = null
+                    moveUpUntilClear(piece, viewWidth, viewHeight)
+                    turnPieceRigidInternal(piece, viewWidth, viewHeight)
                 }
             }
         }
@@ -134,90 +149,86 @@ internal class GameEngine(
                 grid[i][j] = null
             }
         }
-
         score = 0
         isGameOver = false
         isPaused = false
-        isDragging = false
+        draggedPiece = null
         isDraggingCenter = false
         touchedBlockRow = 0
         touchedBlockCol = 0
-        velocityY = 0f
-        springForceX = 0f
-        pieceRotation = 0f
         lastTouchX = 0f
         lastTouchY = 0f
-        isWaitingToTurnRigidAtBottom = false
-        isWaitingToTurnRigidAtPiece = false
-        isSlidingOnContact = false
-        slideDirection = 0f
-        bounceCount = 0
-        isSnapAnimating = false
         justBeatHighScore = false
         isBeatingHighScore = false
-        otherFallingPieces.clear()
+        fallingPieces.clear()
 
-        currentPiece = Random.nextInt(GameConstants.PIECES.size)
-        currentPieceColor = GameConstants.PIECE_COLORS[currentPiece]
+        val pieceType = Random.nextInt(GameConstants.PIECES.size)
+        fallingPieces.add(ActivePiece(
+            type = pieceType,
+            color = GameConstants.PIECE_COLORS[pieceType],
+            x = (viewWidth / 2) - 50f,
+            y = GameConstants.GRID_TOP,
+            rotation = 0f
+        ))
+
         nextPiece = Random.nextInt(GameConstants.PIECES.size)
         nextPieceColor = GameConstants.PIECE_COLORS[nextPiece]
         nextPieceRotation = Random.nextInt(4) * 90f
-
-        pieceX = (viewWidth / 2) - 50f
-        pieceY = GameConstants.GRID_TOP
     }
 
     fun onTouchDown(x: Float, y: Float): Boolean {
-        val hitCell = hitCellFromTouch(x, y, pieceX, pieceY, pieceRotation, GameConstants.PIECES[currentPiece])
-        if (hitCell != null) {
-            springForceX = 0f
-            isDragging = true
-            isDraggingCenter = hitCell in GameConstants.PIECE_CENTER_CELLS[currentPiece]
-            touchedBlockRow = hitCell.first
-            touchedBlockCol = hitCell.second
-            lastTouchX = x
-            lastTouchY = y
-            return true
+        for (piece in fallingPieces) {
+            val hitCell = hitCellFromTouch(x, y, piece.x, piece.y, piece.rotation, GameConstants.PIECES[piece.type])
+            if (hitCell != null) {
+                draggedPiece = piece
+                piece.springForceX = 0f
+                isDraggingCenter = hitCell in GameConstants.PIECE_CENTER_CELLS[piece.type]
+                touchedBlockRow = hitCell.first
+                touchedBlockCol = hitCell.second
+                lastTouchX = x
+                lastTouchY = y
+                return true
+            }
         }
         return false
     }
 
     fun onTouchMove(x: Float, y: Float, viewWidth: Int, viewHeight: Int) {
-        if (!isDragging) return
+        val piece = draggedPiece ?: return
         val dx = x - lastTouchX
         val dy = y - lastTouchY
-        springForceX = dx * GameConstants.SPRING_CARRY
+        piece.springForceX = dx * GameConstants.SPRING_CARRY
         var appliedDx = 0f
         var appliedDy = 0f
-        val prevRotation = pieceRotation
+        val prevRotation = piece.rotation
 
         if (isDraggingCenter) {
             appliedDx = dx
             appliedDy = effectiveVerticalDrag(dy, GameConstants.UPWARD_DRAG_FACTOR)
-            pieceX += appliedDx
-            pieceY += appliedDy
-            keepPiecesInsideWalls(viewWidth)
+            piece.x += appliedDx
+            piece.y += appliedDy
+            keepPieceInsideWalls(piece, viewWidth)
         } else {
-            val shape = GameConstants.PIECES[currentPiece]
-            val rcx = pieceX + shape[0].size * GameConstants.PIECE_SIZE / 2f
-            val rcy = pieceY + shape.size * GameConstants.PIECE_SIZE / 2f
-            val angle = pieceRotation * Math.PI / 180.0
+            val shape = GameConstants.PIECES[piece.type]
+            val rcx = piece.x + shape[0].size * GameConstants.PIECE_SIZE / 2f
+            val rcy = piece.y + shape.size * GameConstants.PIECE_SIZE / 2f
+            val angle = piece.rotation * Math.PI / 180.0
             val cosA = cos(angle)
             val sinA = sin(angle)
-            val bux = pieceX + (touchedBlockCol + 0.5f) * GameConstants.PIECE_SIZE
-            val buy = pieceY + (touchedBlockRow + 0.5f) * GameConstants.PIECE_SIZE
+            val bux = piece.x + (touchedBlockCol + 0.5f) * GameConstants.PIECE_SIZE
+            val buy = piece.y + (touchedBlockRow + 0.5f) * GameConstants.PIECE_SIZE
             val bdx = (bux - rcx).toDouble()
             val bdy = (buy - rcy).toDouble()
             val bx = (rcx + bdx * cosA - bdy * sinA).toFloat()
             val by = (rcy + bdx * sinA + bdy * cosA).toFloat()
             val vx = rcx - bx
             val vy = rcy - by
-            pieceRotation -= rotationDeltaFromDrag(vx, vy, dx, dy, GameConstants.ROTATION_SENSITIVITY)
+            piece.rotation -= rotationDeltaFromDrag(vx, vy, dx, dy, GameConstants.ROTATION_SENSITIVITY)
             appliedDx = dx
             appliedDy = effectiveVerticalDrag(dy, GameConstants.UPWARD_DRAG_FACTOR)
-            pieceX += appliedDx
-            pieceY += appliedDy
-            keepPiecesInsideWalls(viewWidth)
+            piece.x += appliedDx
+            piece.y += appliedDy
+            keepPieceInsideWalls(piece, viewWidth)
         }
 
         lastTouchX = x
@@ -225,30 +236,31 @@ internal class GameEngine(
 
         val cellWidth = (viewWidth - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
         val cellHeight = (viewHeight - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
-        val cellX = ((pieceX - GameConstants.GRID_LEFT) / cellWidth).toInt()
-        val cellY = ((pieceY - GameConstants.GRID_TOP) / cellHeight).toInt()
+        val cellX = ((piece.x - GameConstants.GRID_LEFT) / cellWidth).toInt()
+        val cellY = ((piece.y - GameConstants.GRID_TOP) / cellHeight).toInt()
         if (cellX in 0 until GameConstants.GRID_COLUMNS && cellY in 0 until GameConstants.GRID_ROWS) {
-            if (isPieceAtBottom(viewHeight)) {
-                isDragging = false
-                lockPieceAtBottom(viewWidth, viewHeight)
+            if (checkPieceAtBottom(piece, viewHeight)) {
+                draggedPiece = null
+                turnPieceRigidInternal(piece, viewWidth, viewHeight)
+                return
             }
-            if (isPieceCollidingWithAnotherPiece(cellWidth, cellHeight)) {
-                pieceX -= appliedDx
-                pieceY -= appliedDy
-                pieceRotation = prevRotation
-                isDragging = false
+            if (checkPieceCollidingWithGrid(piece, cellWidth, cellHeight)) {
+                piece.x -= appliedDx
+                piece.y -= appliedDy
+                piece.rotation = prevRotation
+                draggedPiece = null
             }
         }
     }
 
     fun onTouchUp() {
-        isDragging = false
+        draggedPiece = null
     }
 
-    fun getCollisionSolidity(): Float {
+    fun getCollisionSolidity(piece: ActivePiece): Float {
         val elapsed = when {
-            isWaitingToTurnRigidAtBottom -> currentTimeMs() - bottomCollisionTime
-            isWaitingToTurnRigidAtPiece -> currentTimeMs() - pieceCollisionTime
+            piece.isWaitingToTurnRigidAtBottom -> currentTimeMs() - piece.bottomCollisionTime
+            piece.isWaitingToTurnRigidAtPiece  -> currentTimeMs() - piece.pieceCollisionTime
             else -> return 0f
         }
         val t = (elapsed / GameConstants.LOCK_DELAY_MS.toFloat()).coerceIn(0f, 1f)
@@ -256,190 +268,94 @@ internal class GameEngine(
         return (t + oscillation * (1f - t) * 0.6f).coerceIn(0f, 1f)
     }
 
-    fun getLevel(): Int = score / 1000 + 1
+    fun getCollisionSolidity(): Float = fallingPieces.firstOrNull()?.let { getCollisionSolidity(it) } ?: 0f
+
+    private fun computeLevel(): Int = score / GameConstants.NEXT_LEVEL_SCORE + 1
+
+    fun getLevel(): Int = computeLevel()
 
     private fun getLevelMultiplier(): Float {
-        val level = score / 1000 + 1
+        val level = computeLevel()
         return (1 + (level - 1) * GameConstants.LEVEL_DIFFICULTY_FACTOR).coerceAtMost(GameConstants.MAX_LEVEL_MULTIPLIER)
     }
 
-    private fun keepPiecesInsideWalls(viewWidth: Int) {
-        val centers = rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
-        pieceX = clampPieceXByCenters(
-            centers, pieceX,
-            GameConstants.GRID_LEFT,
-            viewWidth - GameConstants.GRID_RIGHT_MARGIN,
-            GameConstants.PIECE_SIZE / 2
+    fun onNextPieceButton(viewWidth: Int, viewHeight: Int) {
+        if (isGameOver || isPaused) return
+        draggedPiece = null
+        val newPiece = ActivePiece(
+            type = nextPiece,
+            color = nextPieceColor,
+            x = (viewWidth / 2) - 50f,
+            y = GameConstants.GRID_TOP,
+            rotation = nextPieceRotation
         )
+        fallingPieces.add(0, newPiece)
+        nextPiece = Random.nextInt(GameConstants.PIECES.size)
+        nextPieceColor = GameConstants.PIECE_COLORS[nextPiece]
+        nextPieceRotation = Random.nextInt(4) * 90f
     }
 
-    private fun checkCollisions(viewWidth: Int, viewHeight: Int) {
-        val cellWidth = (viewWidth - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
-        val cellHeight = (viewHeight - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
+    // ── Internal lock / spawn ─────────────────────────────────────────────────
 
-        val bottomContacts = countContactBlocksAtBottom(viewHeight)
-        val pieceContacts  = countContactBlocksWithPiece(cellWidth, cellHeight)
-        val totalContacts  = bottomContacts + pieceContacts
-
-        when {
-            bounceCount >= 4 && totalContacts >= 1 -> {
-                // Exhausted bounces — force-lock as safety net; cancel any snap animation.
-                isSnapAnimating = false
-                isSlidingOnContact = false
-                slideDirection = 0f
-                if (bottomContacts > 0) {
-                    if (!isWaitingToTurnRigidAtBottom) {
-                        isWaitingToTurnRigidAtBottom = true
-                        bottomCollisionTime = currentTimeMs()
-                        springForceX = 0f
-                    }
-                } else { isWaitingToTurnRigidAtBottom = false }
-                if (pieceContacts > 0) {
-                    if (!isWaitingToTurnRigidAtPiece) {
-                        isWaitingToTurnRigidAtPiece = true
-                        pieceCollisionTime = currentTimeMs()
-                        springForceX = 0f
-                    }
-                } else { isWaitingToTurnRigidAtPiece = false }
-            }
-            totalContacts >= 1 && canLockCleanly(viewWidth, viewHeight) -> {
-                // Piece is resting cleanly on valid empty cells — start lock timer.
-                isSlidingOnContact = false
-                slideDirection = 0f
-                if (bottomContacts > 0) {
-                    if (!isWaitingToTurnRigidAtBottom) {
-                        isWaitingToTurnRigidAtBottom = true
-                        bottomCollisionTime = currentTimeMs()
-                        springForceX = 0f
-                        if (!isSnapAnimating) beginSnapAnimation(viewWidth, viewHeight)
-                    }
-                } else { isWaitingToTurnRigidAtBottom = false }
-                if (pieceContacts > 0) {
-                    if (!isWaitingToTurnRigidAtPiece) {
-                        isWaitingToTurnRigidAtPiece = true
-                        pieceCollisionTime = currentTimeMs()
-                        springForceX = 0f
-                        if (!isSnapAnimating) beginSnapAnimation(viewWidth, viewHeight)
-                    }
-                } else { isWaitingToTurnRigidAtPiece = false }
-            }
-            totalContacts >= 1 -> {
-                // Contact but position not yet clean.
-                // During snap animation the piece is in transit — let it continue, no bounce.
-                if (!isSnapAnimating) {
-                    isWaitingToTurnRigidAtBottom = false
-                    isWaitingToTurnRigidAtPiece = false
-                    if (!isSlidingOnContact) {
-                        bounceCount++
-                        val force = computeSlideForceX(viewHeight, cellWidth, cellHeight)
-                        slideDirection = if (force >= 0f) 1f else -1f
-                        springForceX = slideDirection * GameConstants.SLIDE_IMPULSE
-                        pieceY -= GameConstants.SLIDE_IMPULSE
-                        pieceRotation += slideDirection * GameConstants.BOUNCE_ROTATION_DEG
-                        isSlidingOnContact = true
-                    } else {
-                        springForceX = 0f
-                    }
-                }
-            }
-            else -> {
-                isSlidingOnContact = false
-                slideDirection = 0f
-                // If snap animation is running and the user is NOT dragging, the piece is in
-                // transit (e.g. moving upward toward its grid target) — keep the timer running.
-                // If the user IS dragging to open space, cancel snap and let the piece go fluid.
-                if (!isSnapAnimating || isDragging) {
-                    bounceCount = 0
-                    isWaitingToTurnRigidAtBottom = false
-                    isWaitingToTurnRigidAtPiece = false
-                    isSnapAnimating = false
-                }
-            }
-        }
-    }
-
-    private fun canLockCleanly(viewWidth: Int, viewHeight: Int): Boolean {
-        val cellWidth = (viewWidth - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
-        val cellHeight = (viewHeight - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
-        val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
-
-        var normalized = pieceRotation % 360f
-        if (normalized < 0f) normalized += 360f
-        val snappedRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
-
-        val centers = rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, snappedRotation)
-        var resting = false
-        for ((bx, by) in centers) {
-            val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
-            val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
-            if (gx !in 0 until GameConstants.GRID_COLUMNS || gy !in 0 until GameConstants.GRID_ROWS) return false
-            if (grid[gy][gx] != null) return false
-            // Resting: at the floor, would overflow grid bottom, or solid cell directly below.
-            if (by + GameConstants.PIECE_SIZE / 2f >= gridBottom) resting = true
-            else if (gy + 1 >= GameConstants.GRID_ROWS) resting = true
-            else if (grid[gy + 1][gx] != null) resting = true
-        }
-        return resting
-    }
-
-    internal fun turnPieceRigid(viewWidth: Int, viewHeight: Int) {
+    private fun turnPieceRigidInternal(piece: ActivePiece, viewWidth: Int, viewHeight: Int) {
         onPieceLocked()
 
-        var normalized = pieceRotation % 360f
+        var normalized = piece.rotation % 360f
         if (normalized < 0f) normalized += 360f
-        pieceRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
+        piece.rotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
 
         val cellWidth = (viewWidth - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
         val cellHeight = (viewHeight - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
-
-        val currentPieceShape = GameConstants.PIECES[currentPiece]
+        val shape = GameConstants.PIECES[piece.type]
 
         val step = 5f
         while (true) {
             var blocked = false
-            for ((bx, by) in rotatedBlockCenters(currentPieceShape, pieceX, pieceY, pieceRotation)) {
+            for ((bx, by) in rotatedBlockCenters(shape, piece.x, piece.y, piece.rotation)) {
                 val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
                 val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
                 if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS && grid[gy][gx] != null) {
-                    blocked = true
-                    break
+                    blocked = true; break
                 }
             }
             if (!blocked) break
-            pieceY -= step
-            if (pieceY < GameConstants.GRID_TOP) break
+            piece.y -= step
+            if (piece.y < GameConstants.GRID_TOP) break
         }
 
-        for ((bx, by) in rotatedBlockCenters(currentPieceShape, pieceX, pieceY, pieceRotation)) {
-            val gridX = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
-            val gridY = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
-            if (gridX in 0 until GameConstants.GRID_COLUMNS && gridY in 0 until GameConstants.GRID_ROWS) {
-                grid[gridY][gridX] = currentPieceColor
+        for ((bx, by) in rotatedBlockCenters(shape, piece.x, piece.y, piece.rotation)) {
+            val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
+            val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
+            if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS) {
+                grid[gy][gx] = piece.color
             }
         }
 
         checkLines()
 
-        currentPiece = nextPiece
-        currentPieceColor = nextPieceColor
-        val spawnRotation = nextPieceRotation
-        nextPiece = Random.nextInt(GameConstants.PIECES.size)
-        nextPieceColor = GameConstants.PIECE_COLORS[nextPiece]
-        nextPieceRotation = Random.nextInt(4) * 90f
+        if (draggedPiece === piece) draggedPiece = null
+        fallingPieces.remove(piece)
 
-        pieceX = (viewWidth / 2) - 50f
-        pieceY = GameConstants.GRID_TOP
-        velocityY = 0f
-        springForceX = 0f
-        pieceRotation = spawnRotation
-        isSlidingOnContact = false
-        slideDirection = 0f
-        bounceCount = 0
-        isSnapAnimating = false
+        if (fallingPieces.isEmpty()) {
+            spawnNextPiece(viewWidth, viewHeight)
+        }
 
         if (grid[0].any { it != null }) {
             isGameOver = true
         }
+    }
+
+    private fun spawnNextPiece(viewWidth: Int, viewHeight: Int) {
+        fallingPieces.add(0, ActivePiece(
+            type = nextPiece,
+            color = nextPieceColor,
+            x = (viewWidth / 2) - 50f,
+            y = GameConstants.GRID_TOP,
+            rotation = nextPieceRotation
+        ))
+        nextPiece = Random.nextInt(GameConstants.PIECES.size)
+        nextPieceColor = GameConstants.PIECE_COLORS[nextPiece]
+        nextPieceRotation = Random.nextInt(4) * 90f
     }
 
     internal fun checkLines() {
@@ -452,7 +368,6 @@ internal class GameEngine(
                 }
                 grid[0] = Array(GameConstants.GRID_COLUMNS) { null }
                 linesCleared++
-                // stay at i — the shifted row needs re-checking
             } else {
                 i--
             }
@@ -468,9 +383,7 @@ internal class GameEngine(
             }
             score += points
             val newLevel = getLevel()
-            if (newLevel > prevLevel) {
-                onLevelUp()
-            }
+            if (newLevel > prevLevel) onLevelUp()
             isBeatingHighScore = score > highScore
             if (score > highScore) {
                 highScore = score
@@ -481,53 +394,144 @@ internal class GameEngine(
         }
     }
 
-    internal fun isPieceAtBottom(viewHeight: Int): Boolean {
-        val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
-        return rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
-            .any { (_, by) -> by + GameConstants.PIECE_SIZE / 2 > gridBottom }
+    // ── Backward-compat wrappers (called by tests) ────────────────────────────
+
+    internal fun turnPieceRigid(viewWidth: Int, viewHeight: Int) {
+        fallingPieces.firstOrNull()?.let { turnPieceRigidInternal(it, viewWidth, viewHeight) }
     }
 
     internal fun lockPieceAtBottom(viewWidth: Int, viewHeight: Int) {
-        turnPieceRigid(viewWidth, viewHeight)
+        fallingPieces.firstOrNull()?.let { turnPieceRigidInternal(it, viewWidth, viewHeight) }
     }
 
-    fun onNextPieceButton(viewWidth: Int, viewHeight: Int) {
-        if (isGameOver || isPaused) return
-        // Move current piece to other falling pieces (it continues falling)
-        otherFallingPieces.add(FallingPiece(
-            type = currentPiece,
-            x = pieceX,
-            y = pieceY,
-            rotation = pieceRotation,
-            color = currentPieceColor
-        ))
+    internal fun isPieceAtBottom(viewHeight: Int): Boolean =
+        fallingPieces.firstOrNull()?.let { checkPieceAtBottom(it, viewHeight) } ?: false
 
-        // Spawn next piece as new current piece
-        currentPiece = nextPiece
-        currentPieceColor = nextPieceColor
-        pieceX = (viewWidth / 2) - 50f
-        pieceY = GameConstants.GRID_TOP
-        pieceRotation = nextPieceRotation
+    internal fun isPieceCollidingWithAnotherPiece(cellWidth: Float, cellHeight: Float): Boolean =
+        fallingPieces.firstOrNull()?.let { checkPieceCollidingWithGrid(it, cellWidth, cellHeight) } ?: false
 
-        // Reset state for new piece
-        isDragging = false
-        springForceX = 0f
-        isWaitingToTurnRigidAtBottom = false
-        isWaitingToTurnRigidAtPiece = false
-        isSlidingOnContact = false
-        slideDirection = 0f
-        bounceCount = 0
-        isSnapAnimating = false
+    // ── Per-piece physics helpers ─────────────────────────────────────────────
 
-        // Generate new next piece
-        nextPiece = Random.nextInt(GameConstants.PIECES.size)
-        nextPieceColor = GameConstants.PIECE_COLORS[nextPiece]
-        nextPieceRotation = Random.nextInt(4) * 90f
+    private fun keepPieceInsideWalls(piece: ActivePiece, viewWidth: Int) {
+        val centers = rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)
+        piece.x = clampPieceXByCenters(
+            centers, piece.x,
+            GameConstants.GRID_LEFT,
+            viewWidth - GameConstants.GRID_RIGHT_MARGIN,
+            GameConstants.PIECE_SIZE / 2
+        )
     }
 
-    internal fun isPieceCollidingWithAnotherPiece(cellWidth: Float, cellHeight: Float): Boolean {
+    private fun checkPieceCollisions(piece: ActivePiece, pieceIsDragging: Boolean, viewWidth: Int, viewHeight: Int) {
+        val cellWidth  = (viewWidth  - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN)  / GameConstants.GRID_COLUMNS
+        val cellHeight = (viewHeight - GameConstants.GRID_TOP  - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
+
+        val bottomContacts = countContactBlocksAtBottom(piece, viewHeight)
+        val pieceContacts  = countContactBlocksWithPiece(piece, cellWidth, cellHeight)
+        val totalContacts  = bottomContacts + pieceContacts
+
+        when {
+            piece.bounceCount >= 4 && totalContacts >= 1 -> {
+                piece.isSnapAnimating = false
+                piece.isSlidingOnContact = false
+                piece.slideDirection = 0f
+                if (bottomContacts > 0) {
+                    if (!piece.isWaitingToTurnRigidAtBottom) {
+                        piece.isWaitingToTurnRigidAtBottom = true
+                        piece.bottomCollisionTime = currentTimeMs()
+                        piece.springForceX = 0f
+                    }
+                } else { piece.isWaitingToTurnRigidAtBottom = false }
+                if (pieceContacts > 0) {
+                    if (!piece.isWaitingToTurnRigidAtPiece) {
+                        piece.isWaitingToTurnRigidAtPiece = true
+                        piece.pieceCollisionTime = currentTimeMs()
+                        piece.springForceX = 0f
+                    }
+                } else { piece.isWaitingToTurnRigidAtPiece = false }
+            }
+            totalContacts >= 1 && canPieceLockCleanly(piece, viewWidth, viewHeight) -> {
+                piece.isSlidingOnContact = false
+                piece.slideDirection = 0f
+                if (bottomContacts > 0) {
+                    if (!piece.isWaitingToTurnRigidAtBottom) {
+                        piece.isWaitingToTurnRigidAtBottom = true
+                        piece.bottomCollisionTime = currentTimeMs()
+                        piece.springForceX = 0f
+                        if (!piece.isSnapAnimating) beginSnapAnimation(piece, viewWidth, viewHeight)
+                    }
+                } else { piece.isWaitingToTurnRigidAtBottom = false }
+                if (pieceContacts > 0) {
+                    if (!piece.isWaitingToTurnRigidAtPiece) {
+                        piece.isWaitingToTurnRigidAtPiece = true
+                        piece.pieceCollisionTime = currentTimeMs()
+                        piece.springForceX = 0f
+                        if (!piece.isSnapAnimating) beginSnapAnimation(piece, viewWidth, viewHeight)
+                    }
+                } else { piece.isWaitingToTurnRigidAtPiece = false }
+            }
+            totalContacts >= 1 -> {
+                if (!piece.isSnapAnimating) {
+                    piece.isWaitingToTurnRigidAtBottom = false
+                    piece.isWaitingToTurnRigidAtPiece = false
+                    if (!piece.isSlidingOnContact) {
+                        piece.bounceCount++
+                        val force = computeSlideForceX(piece, viewHeight, cellWidth, cellHeight)
+                        piece.slideDirection = if (force >= 0f) 1f else -1f
+                        piece.springForceX = piece.slideDirection * GameConstants.SLIDE_IMPULSE
+                        piece.y -= GameConstants.SLIDE_IMPULSE
+                        piece.rotation += piece.slideDirection * GameConstants.BOUNCE_ROTATION_DEG
+                        piece.isSlidingOnContact = true
+                    } else {
+                        piece.springForceX = 0f
+                    }
+                }
+            }
+            else -> {
+                piece.isSlidingOnContact = false
+                piece.slideDirection = 0f
+                if (!piece.isSnapAnimating || pieceIsDragging) {
+                    piece.bounceCount = 0
+                    piece.isWaitingToTurnRigidAtBottom = false
+                    piece.isWaitingToTurnRigidAtPiece = false
+                    piece.isSnapAnimating = false
+                }
+            }
+        }
+    }
+
+    private fun canPieceLockCleanly(piece: ActivePiece, viewWidth: Int, viewHeight: Int): Boolean {
+        val cellWidth  = (viewWidth  - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN)  / GameConstants.GRID_COLUMNS
+        val cellHeight = (viewHeight - GameConstants.GRID_TOP  - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
+        val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
+
+        var normalized = piece.rotation % 360f
+        if (normalized < 0f) normalized += 360f
+        val snappedRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
+
+        val centers = rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, snappedRotation)
+        var resting = false
+        for ((bx, by) in centers) {
+            val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
+            val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
+            if (gx !in 0 until GameConstants.GRID_COLUMNS || gy !in 0 until GameConstants.GRID_ROWS) return false
+            if (grid[gy][gx] != null) return false
+            if (by + GameConstants.PIECE_SIZE / 2f >= gridBottom) resting = true
+            else if (gy + 1 >= GameConstants.GRID_ROWS) resting = true
+            else if (grid[gy + 1][gx] != null) resting = true
+        }
+        return resting
+    }
+
+    private fun checkPieceAtBottom(piece: ActivePiece, viewHeight: Int): Boolean {
+        val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
+        return rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)
+            .any { (_, by) -> by + GameConstants.PIECE_SIZE / 2 > gridBottom }
+    }
+
+    private fun checkPieceCollidingWithGrid(piece: ActivePiece, cellWidth: Float, cellHeight: Float): Boolean {
         val blockSize = GameConstants.PIECE_SIZE
-        for ((bx, by) in rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)) {
+        for ((bx, by) in rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)) {
             val corners = listOf(
                 bx - blockSize / 2f to by - blockSize / 2f,
                 bx + blockSize / 2f to by - blockSize / 2f,
@@ -545,17 +549,17 @@ internal class GameEngine(
         return false
     }
 
-    private fun countContactBlocksAtBottom(viewHeight: Int): Int {
+    private fun countContactBlocksAtBottom(piece: ActivePiece, viewHeight: Int): Int {
         val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
         val halfBlock = GameConstants.PIECE_SIZE / 2 - GameConstants.BLOCK_INSET
-        return rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
+        return rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)
             .count { (_, by) -> by + halfBlock > gridBottom }
     }
 
-    private fun countContactBlocksWithPiece(cellWidth: Float, cellHeight: Float): Int {
+    private fun countContactBlocksWithPiece(piece: ActivePiece, cellWidth: Float, cellHeight: Float): Int {
         val blockSize = GameConstants.PIECE_SIZE
         val h = blockSize / 2f - GameConstants.BLOCK_INSET
-        return rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
+        return rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)
             .count { (bx, by) ->
                 listOf(
                     bx - h to by - h,
@@ -572,56 +576,47 @@ internal class GameEngine(
             }
     }
 
-    private fun computeSlideForceX(viewHeight: Int, cellWidth: Float, cellHeight: Float): Float {
+    private fun computeSlideForceX(piece: ActivePiece, viewHeight: Int, cellWidth: Float, cellHeight: Float): Float {
         val blockSize = GameConstants.PIECE_SIZE
         val gridBottom = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
-        val centers = rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, pieceRotation)
+        val centers = rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)
 
         val h = blockSize / 2f - GameConstants.BLOCK_INSET
         val contactXs = mutableListOf<Float>()
-        // Bottom-wall contacts: use the falling block's own center X
         centers.forEach { (bx, by) ->
             if (by + h > gridBottom) contactXs.add(bx)
         }
-        // Piece-to-piece contacts: use the placed block's center X so that direction
-        // is determined by where the obstacle actually is, not which side of the falling
-        // piece the contacting block happens to sit on.
         val hitCells = mutableSetOf<Pair<Int, Int>>()
         centers.forEach { (bx, by) ->
-            listOf(
-                bx - h to by - h,
-                bx + h to by - h,
-                bx - h to by + h,
-                bx + h to by + h
-            ).forEach { (cx, cy) ->
-                val cellX = ((cx - GameConstants.GRID_LEFT) / cellWidth).toInt()
-                val cellY = ((cy - GameConstants.GRID_TOP) / cellHeight).toInt()
-                if (cellX in 0 until GameConstants.GRID_COLUMNS &&
-                    cellY in 0 until GameConstants.GRID_ROWS &&
-                    grid[cellY][cellX] != null) {
-                    hitCells.add(cellX to cellY)
+            listOf(bx - h to by - h, bx + h to by - h, bx - h to by + h, bx + h to by + h)
+                .forEach { (cx, cy) ->
+                    val cellX = ((cx - GameConstants.GRID_LEFT) / cellWidth).toInt()
+                    val cellY = ((cy - GameConstants.GRID_TOP) / cellHeight).toInt()
+                    if (cellX in 0 until GameConstants.GRID_COLUMNS &&
+                        cellY in 0 until GameConstants.GRID_ROWS &&
+                        grid[cellY][cellX] != null) {
+                        hitCells.add(cellX to cellY)
+                    }
                 }
-            }
         }
         hitCells.forEach { (cellX, _) ->
             contactXs.add(GameConstants.GRID_LEFT + (cellX + 0.5f) * cellWidth)
         }
-
         if (contactXs.isEmpty()) return 0f
         val pieceCenterX = centers.map { it.first }.average().toFloat()
         val contactCenterX = contactXs.average().toFloat()
         return if (contactCenterX > pieceCenterX) -GameConstants.SLIDE_IMPULSE else GameConstants.SLIDE_IMPULSE
     }
 
-    private fun beginSnapAnimation(viewWidth: Int, viewHeight: Int) {
+    private fun beginSnapAnimation(piece: ActivePiece, viewWidth: Int, viewHeight: Int) {
         val cellWidth  = (viewWidth  - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN)  / GameConstants.GRID_COLUMNS
         val cellHeight = (viewHeight - GameConstants.GRID_TOP  - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
 
-        var normalized = pieceRotation % 360f
+        var normalized = piece.rotation % 360f
         if (normalized < 0f) normalized += 360f
-        snapTargetRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
+        piece.snapTargetRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
 
-        val centers = rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, pieceY, snapTargetRotation)
+        val centers = rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.snapTargetRotation)
         var totalDx = 0f; var totalDy = 0f; var count = 0
         for ((bx, by) in centers) {
             val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt().coerceIn(0, GameConstants.GRID_COLUMNS - 1)
@@ -631,43 +626,40 @@ internal class GameEngine(
             count++
         }
         if (count > 0) {
-            snapTargetX = pieceX + totalDx / count
-            snapTargetY = pieceY + totalDy / count
+            piece.snapTargetX = piece.x + totalDx / count
+            piece.snapTargetY = piece.y + totalDy / count
         } else {
-            snapTargetX = pieceX
-            snapTargetY = pieceY
+            piece.snapTargetX = piece.x
+            piece.snapTargetY = piece.y
         }
-        bounceCount = 0
-        isSnapAnimating = true
+        piece.bounceCount = 0
+        piece.isSnapAnimating = true
     }
 
-    private fun applySnapPull(t: Float) {
+    private fun applySnapPull(piece: ActivePiece, t: Float) {
         val xStrength   = t * GameConstants.SNAP_PULL_SPEED
         val rotStrength = t * GameConstants.SNAP_ROTATION_SPEED
-        pieceX        += (snapTargetX - pieceX) * xStrength
-        pieceY        += (snapTargetY - pieceY) * xStrength
-        pieceRotation  = lerpAngleDeg(pieceRotation, snapTargetRotation, rotStrength)
+        piece.x        += (piece.snapTargetX - piece.x) * xStrength
+        piece.y        += (piece.snapTargetY - piece.y) * xStrength
+        piece.rotation  = lerpAngleDeg(piece.rotation, piece.snapTargetRotation, rotStrength)
     }
 
-    private fun moveUpUntilClear(viewWidth: Int, viewHeight: Int) {
-        val cellWidth = (viewWidth - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
-        val cellHeight = (viewHeight - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
+    private fun moveUpUntilClear(piece: ActivePiece, viewWidth: Int, viewHeight: Int) {
+        val cellWidth  = (viewWidth  - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN)  / GameConstants.GRID_COLUMNS
+        val cellHeight = (viewHeight - GameConstants.GRID_TOP  - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
         val step = 5f
         var moved = false
 
-        while (doesPieceCollideWithGridAtY(pieceY, cellWidth, cellHeight)) {
-            pieceY -= step
+        while (doesPieceCollideWithGridAtY(piece, piece.y, cellWidth, cellHeight)) {
+            piece.y -= step
             moved = true
-            if (pieceY < GameConstants.GRID_TOP) break
+            if (piece.y < GameConstants.GRID_TOP) break
         }
-
-        if (moved) {
-            keepPiecesInsideWalls(viewWidth)
-        }
+        if (moved) keepPieceInsideWalls(piece, viewWidth)
     }
 
-    private fun doesPieceCollideWithGridAtY(testY: Float, cellWidth: Float, cellHeight: Float): Boolean {
-        for ((bx, by) in rotatedBlockCenters(GameConstants.PIECES[currentPiece], pieceX, testY, pieceRotation)) {
+    private fun doesPieceCollideWithGridAtY(piece: ActivePiece, testY: Float, cellWidth: Float, cellHeight: Float): Boolean {
+        for ((bx, by) in rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, testY, piece.rotation)) {
             val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
             val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
             if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS && grid[gy][gx] != null) {
