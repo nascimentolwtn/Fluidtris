@@ -452,9 +452,10 @@ internal class GameEngine(
         val cellWidth  = (viewWidth  - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN)  / GameConstants.GRID_COLUMNS
         val cellHeight = (viewHeight - GameConstants.GRID_TOP  - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
 
-        val bottomContacts = countContactBlocksAtBottom(piece, viewHeight)
-        val pieceContacts  = countContactBlocksWithPiece(piece, cellWidth, cellHeight)
-        val totalContacts  = bottomContacts + pieceContacts
+        val bottomContacts    = countContactBlocksAtBottom(piece, viewHeight)
+        val pieceContacts     = countContactBlocksWithPiece(piece, cellWidth, cellHeight)
+        val livePieceContacts = if (!pieceIsDragging) countContactBlocksWithAnimatingPieces(piece) else 0
+        val totalContacts     = bottomContacts + pieceContacts
 
         when {
             piece.bounceCount >= 4 && totalContacts >= 1 -> {
@@ -503,6 +504,22 @@ internal class GameEngine(
                     if (!piece.isSlidingOnContact) {
                         piece.bounceCount++
                         val force = computeSlideForceX(piece, viewHeight, cellWidth, cellHeight)
+                        piece.slideDirection = if (force >= 0f) 1f else -1f
+                        piece.springForceX = piece.slideDirection * GameConstants.SLIDE_IMPULSE
+                        piece.y -= GameConstants.SLIDE_IMPULSE
+                        piece.rotation += piece.slideDirection * GameConstants.BOUNCE_ROTATION_DEG
+                        piece.isSlidingOnContact = true
+                    } else {
+                        piece.springForceX = 0f
+                    }
+                }
+            }
+            livePieceContacts >= 1 -> {
+                if (!piece.isSnapAnimating) {
+                    piece.isWaitingToTurnRigidAtBottom = false
+                    piece.isWaitingToTurnRigidAtPiece = false
+                    if (!piece.isSlidingOnContact) {
+                        val force = computeSlideForceXFromAnimatingPieces(piece)
                         piece.slideDirection = if (force >= 0f) 1f else -1f
                         piece.springForceX = piece.slideDirection * GameConstants.SLIDE_IMPULSE
                         piece.y -= GameConstants.SLIDE_IMPULSE
@@ -600,6 +617,53 @@ internal class GameEngine(
                     grid[cellY][cellX] != null
                 }
             }
+    }
+
+    private fun countContactBlocksWithAnimatingPieces(piece: ActivePiece): Int {
+        if (piece.isSnapAnimating) return 0
+        val blockSize = GameConstants.PIECE_SIZE
+        val h = blockSize / 2f - GameConstants.BLOCK_INSET
+        val halfSize = blockSize / 2f
+        val animatingOthers = fallingPieces.filter { it !== piece && it.isSnapAnimating }
+        if (animatingOthers.isEmpty()) return 0
+        return rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)
+            .count { (bx, by) ->
+                listOf(bx - h to by - h, bx + h to by - h, bx - h to by + h, bx + h to by + h)
+                    .any { (cx, cy) ->
+                        animatingOthers.any { other ->
+                            rotatedBlockCenters(GameConstants.PIECES[other.type], other.x, other.y, other.rotation)
+                                .any { (obx, oby) ->
+                                    kotlin.math.abs(cx - obx) < halfSize && kotlin.math.abs(cy - oby) < halfSize
+                                }
+                        }
+                    }
+            }
+    }
+
+    private fun computeSlideForceXFromAnimatingPieces(piece: ActivePiece): Float {
+        val blockSize = GameConstants.PIECE_SIZE
+        val h = blockSize / 2f - GameConstants.BLOCK_INSET
+        val halfSize = blockSize / 2f
+        val centers = rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)
+        val pieceCenterX = centers.map { it.first }.average().toFloat()
+        val animatingOthers = fallingPieces.filter { it !== piece && it.isSnapAnimating }
+        val contactXs = mutableListOf<Float>()
+        centers.forEach { (bx, by) ->
+            listOf(bx - h to by - h, bx + h to by - h, bx - h to by + h, bx + h to by + h)
+                .forEach { (cx, cy) ->
+                    animatingOthers.forEach { other ->
+                        rotatedBlockCenters(GameConstants.PIECES[other.type], other.x, other.y, other.rotation)
+                            .forEach { (obx, oby) ->
+                                if (kotlin.math.abs(cx - obx) < halfSize && kotlin.math.abs(cy - oby) < halfSize) {
+                                    contactXs.add(obx)
+                                }
+                            }
+                    }
+                }
+        }
+        if (contactXs.isEmpty()) return 0f
+        val contactCenterX = contactXs.average().toFloat()
+        return if (contactCenterX > pieceCenterX) -GameConstants.SLIDE_IMPULSE else GameConstants.SLIDE_IMPULSE
     }
 
     private fun computeSlideForceX(piece: ActivePiece, viewHeight: Int, cellWidth: Float, cellHeight: Float): Float {
