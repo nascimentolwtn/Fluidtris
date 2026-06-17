@@ -94,6 +94,8 @@ internal class GameEngine(
         if (viewWidth == 0 || viewHeight == 0) return
         if (isPaused || isGameOver) return
 
+        if (fallingPieces.isEmpty()) spawnNextPiece(viewWidth, viewHeight)
+
         val scaledGravity = GameConstants.GRAVITY * getLevelMultiplier()
 
         for (piece in fallingPieces.toList()) {

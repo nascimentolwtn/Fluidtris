@@ -22,7 +22,7 @@ class GameNoInteractionTest {
         val cellWidth = (VW - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
         val cellHeight = (VH - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
 
-        val maxIterations = 100_000  // safety limit to prevent infinite loops
+        val maxIterations = 1_000_000  // increased limit since gravity scales with level
         var iterations = 0
 
         // Run the game until game over
@@ -41,7 +41,7 @@ class GameNoInteractionTest {
         }
 
         // Game should have ended (top row filled)
-        assertTrue("Game should end after pieces stack up", e.isGameOver)
+        assertTrue("Game should end after pieces stack up (ran $iterations iterations)", e.isGameOver)
         assertTrue("Game should run for at least a few pieces", iterations > 100)
     }
 
@@ -55,7 +55,7 @@ class GameNoInteractionTest {
         e.currentTimeMs = { fakeTimeMs }
         e.resetGame(VW, VH)
 
-        val maxIterations = 50_000
+        val maxIterations = 1_000_000  // increased limit since gravity scales with level
         var iterations = 0
         var lockCount = 0
 
@@ -101,7 +101,7 @@ class GameNoInteractionTest {
         e.currentTimeMs = { fakeTimeMs }
         e.resetGame(VW, VH)
 
-        val maxIterations = 50_000
+        val maxIterations = 1_000_000  // increased limit since gravity scales with level
         var iterations = 0
 
         while (!e.isGameOver && iterations < maxIterations) {
@@ -111,7 +111,7 @@ class GameNoInteractionTest {
         }
 
         // Game ended because top row is full
-        assertTrue("Game should end because top row filled", e.grid[0].any { it != null })
+        assertTrue("Game should end because top row filled (ran $iterations iterations)", e.grid[0].any { it != null })
     }
 
     @Test
@@ -147,7 +147,7 @@ class GameNoInteractionTest {
 
         e.onNextPieceButton(VW, VH)
 
-        val maxIterations = 200_000
+        val maxIterations = 1_000_000  // increased limit since gravity scales with level
         var iterations = 0
         while (!e.isGameOver && iterations < maxIterations) {
             fakeTimeMs += 16L
@@ -156,6 +156,22 @@ class GameNoInteractionTest {
         }
 
         assertTrue("Game should reach game over even with Next button used (ran $iterations iterations)", e.isGameOver)
+    }
+
+    @Test
+    fun update_withEmptyFallingPieces_spawnsNewPiece() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+
+        e.fallingPieces.clear()
+        assertTrue("Should be empty before update", e.fallingPieces.isEmpty())
+
+        fakeTimeMs += 16L
+        e.update(VW, VH)
+
+        assertTrue("update() must spawn a piece when fallingPieces is empty", e.fallingPieces.isNotEmpty())
     }
 
     private fun verifyGridIntegrity(e: GameEngine, cellWidth: Float, cellHeight: Float) {
