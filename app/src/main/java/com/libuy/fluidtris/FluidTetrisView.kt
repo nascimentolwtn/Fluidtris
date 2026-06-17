@@ -167,6 +167,19 @@ class FluidTetrisView @JvmOverloads constructor(
             engine.nextPieceColor, 1f, previewBlockSize)
         canvas.restore()
 
+        // Next button (below preview)
+        if (!engine.isGameOver && !engine.isPaused) {
+            val nextButtonLeft = previewX - 8f
+            val nextButtonTop = previewY + previewBoxSize + 16f
+            val nextButtonRight = nextButtonLeft + GameConstants.NEXT_BUTTON_WIDTH
+            val nextButtonBottom = nextButtonTop + GameConstants.NEXT_BUTTON_HEIGHT
+            paint.color = Color.argb(200, 80, 150, 100)
+            canvas.drawRect(nextButtonLeft, nextButtonTop, nextButtonRight, nextButtonBottom, paint)
+            paint.color = Color.argb(255, 255, 255, 255)
+            paint.textSize = 40f
+            canvas.drawText("Next", nextButtonLeft + 45f, nextButtonTop + 55f, paint)
+        }
+
         paint.color = Color.argb(180, 20, 60, 100)
         canvas.drawRect(10f, 5f, 400f, 155f, paint)
         paint.textSize = 40f
@@ -318,6 +331,21 @@ class FluidTetrisView @JvmOverloads constructor(
                 if (event.x in (width - 200f)..(width - 20f) && event.y in (height - 150f)..(height - 50f)) {
                     gameListener?.onExitPressed()
                     return true
+                }
+                // Next button touch detection
+                if (!engine.isPaused && !engine.isGameOver) {
+                    val previewBoxSize = 160f
+                    val previewX = width - previewBoxSize - 20f
+                    val previewY = 20f
+                    val nextButtonLeft = previewX - 8f
+                    val nextButtonTop = previewY + previewBoxSize + 16f
+                    val nextButtonRight = nextButtonLeft + GameConstants.NEXT_BUTTON_WIDTH
+                    val nextButtonBottom = nextButtonTop + GameConstants.NEXT_BUTTON_HEIGHT
+                    if (event.x in nextButtonLeft..nextButtonRight && event.y in nextButtonTop..nextButtonBottom) {
+                        engine.onNextPieceButton(width, height)
+                        invalidate()
+                        return true
+                    }
                 }
             }
             MotionEvent.ACTION_MOVE -> {
