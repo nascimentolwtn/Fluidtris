@@ -1,27 +1,30 @@
-# Fluidtris
+# Fluidtris v3.0
 
-A fluid, touch-driven Tetris-like game for Android where pieces can be freely dragged and rotated before locking into place.
+A fluid, touch-driven Tetris-like game for Android where pieces can be freely dragged, rotated, and collide with each other before locking into place.
 
 ## 🎮 Overview
 
-Fluidtris reimagines the classic block-dropping puzzle with intuitive physics-based interaction. Built with Kotlin and targeting Android API 29+, the game features:
+Fluidtris reimagines the classic block-dropping puzzle with intuitive physics-based interaction and multi-piece simultaneous gameplay. Built with Kotlin and targeting Android API 29+, the game features:
 
 - **Fluid Controls**: Drag pieces anywhere on screen and rotate them with swipe gestures
-- **Classic Gameplay**: Clear lines by filling rows with 7×20 grid play area
-- **Smooth Animation**: 60 FPS game loop with responsive touch feedback
-- **Sound Effects**: Audio feedback for line clears and piece locking
+- **Multi-Piece Physics**: Multiple pieces fall simultaneously and collide with each other and the grid
+- **Level Progression**: Difficulty scales with score; higher levels increase piece fall speed
+- **Interactive Controls**: Next button spawns additional falling pieces; dual positioning for left/right-handed players
+- **Pause & Game Over**: Comprehensive pause overlay with sound toggle; celebration audio on game over
+- **Smooth Animation**: 60 FPS game loop with snap-to-grid animations and responsive touch feedback
+- **Sound Effects**: Audio feedback for line clears, piece locking, and level-up events
 
 ## 🏗️ Architecture
 
-The entire game logic is contained in just two files:
+Game logic is cleanly separated across six specialized files:
 
-- **`MainActivity.kt`** - Activity boilerplate handling edge-to-edge display setup
-- **`FluidTetrisView.kt`** - Custom View with complete game implementation including:
-  - Game loop (60 FPS via Handler)
-  - Physics and collision detection
-  - Touch input handling
-  - Rendering with Canvas
-  - Sound management
+- **`MainActivity.kt`** — Activity boilerplate handling edge-to-edge display setup
+- **`FluidTetrisView.kt`** — Thin custom View: rendering and touch input only, no game logic
+- **`GameEngine.kt`** — All game state and logic (zero Android imports for testability)
+- **`GameConstants.kt`** — Every magic number: grid, margins, speeds, delays, piece shapes/colors
+- **`GameMath.kt`** — Pure math helpers: rotations, collision detection, wall clamping
+- **`SoundManager.kt`** — MediaPlayer wrappers for audio feedback
+- **`HighScoreManager.kt`** — SharedPreferences persistence for high scores and levels
 
 ## 🛠️ Build & Run
 
@@ -56,8 +59,21 @@ The entire game logic is contained in just two files:
 - **Rotation**: 
   - Swipe top half of piece → clockwise rotation
   - Swipe bottom half → counter-clockwise rotation
-- **Smart Locking**: 3-second timer when piece contacts bottom or other pieces
-- **Next Button**: Most engaging feature! Two large squared buttons let you skip the current piece and advance to the next one immediately — one positioned above "New Game" (left side) for left-handed players, one above "Exit" (right side) for right-handed players. Disabled during pause and game over
+- **Smart Locking**: 3-second snap-to-grid animation when piece contacts bottom or other pieces
+
+### Multi-Piece Gameplay
+- **Simultaneous Falls**: Multiple pieces fall and collide with each other independently
+- **Next Button**: Two large squared buttons let you spawn additional falling pieces immediately — one positioned above "New Game" (left side) for left-handed players, one above "Exit" (right side) for right-handed players. Disabled during pause and game over. Next-piece preview rotates to show orientation
+
+### Level Progression
+- **Progressive Difficulty**: Game levels increase with score (every 300 points); each level multiplies gravity by 1.3x up to 3x maximum
+- **Level Display**: Current level shown in top-left corner
+- **Level-Up Audio**: Celebratory sound on advancement
+
+### Pause & Game Over
+- **Pause Controls**: Three conveniently positioned pause buttons accessible mid-game
+- **Pause Overlay**: Displays Resume, New Game, Exit options plus a sound toggle
+- **Game Over Celebration**: Special audio feedback when the game ends
 
 ### Grid System
 - **Dimensions**: 7 columns × 20 rows
@@ -67,16 +83,15 @@ The entire game logic is contained in just two files:
 ### Audio
 - `move_sound.ogg` - Line clear effect
 - `rigid_sound.wav` - Piece lock effect
+- Game Over celebration audio
+- Level-up sound
 
 ## ⚠️ Known Issues & Limitations
 
 | Issue | Description | Status |
 |-------|-------------|--------|
-| High Score Persistence | High score stored only in memory, resets on app close | Open |
-| Unused Spring Physics | Spring system scaffolded but not active in game loop | Open |
-| Collision Detection | `collideWithAnotherPiece()` defined but never called | Open |
-| Rotation Bounds | Wall collision doesn't account for rotated piece shape | Open |
-| Next Piece Preview | Currently renders colored square instead of actual piece | Open |
+| High Score Name Tracking | High score stored as plain integer; no player name or date | Open |
+| Next Piece Preview Shape | Preview renders as colored square instead of actual piece shape | Open |
 
 ## 🎨 Rendering
 

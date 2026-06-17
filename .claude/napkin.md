@@ -1,10 +1,11 @@
 # Napkin Runbook
 
-## v2.4 - Curation Rules
+## v3.0 - Curation Rules
 - Re-prioritize on every read.
 - Keep recurring, high-value notes only.
 - Max 10 items per category.
 - Each item includes date + "Do instead".
+- v3.0: Multi-piece physics fully operational. `ActivePiece` list with collision. Level progression and pause controls live.
 
 ## Execution & Validation (Highest Priority)
 1. **[2026-06-02] Always build with gradlew on Windows**
