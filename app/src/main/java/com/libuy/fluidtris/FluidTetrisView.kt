@@ -21,7 +21,7 @@ class FluidTetrisView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     companion object {
-        private const val NEXT_BUTTON_SQUARED_SIZE = 140f
+        private const val NEXT_BUTTON_SQUARED_SIZE = 160f
         private const val GAME_LOOP_INTERVAL_MS = 16L
     }
 
@@ -136,22 +136,22 @@ class FluidTetrisView @JvmOverloads constructor(
             engine.nextPieceColor, 1f, previewBlockSize)
         canvas.restore()
 
-        // Next buttons (left and right, above New Game and Exit)
+        // Next buttons (left and right, vertically centered)
         if (!engine.isGameOver && !engine.isPaused) {
             val buttonSize = NEXT_BUTTON_SQUARED_SIZE
 
-            // Left button (above New Game)
+            // Left button
             val leftButtonX = 20f
-            val leftButtonY = height - 310f
+            val leftButtonY = height / 2 - buttonSize / 2
             paint.color = Color.argb(200, 80, 150, 100)
             canvas.drawRect(leftButtonX, leftButtonY, leftButtonX + buttonSize, leftButtonY + buttonSize, paint)
             paint.color = Color.argb(255, 255, 255, 255)
             paint.textSize = 44f
             canvas.drawText("Next", leftButtonX + 25f, leftButtonY + 90f, paint)
 
-            // Right button (above Exit)
+            // Right button
             val rightButtonX = width - 20f - buttonSize
-            val rightButtonY = height - 310f
+            val rightButtonY = height / 2 - buttonSize / 2
             paint.color = Color.argb(200, 80, 150, 100)
             canvas.drawRect(rightButtonX, rightButtonY, rightButtonX + buttonSize, rightButtonY + buttonSize, paint)
             paint.color = Color.argb(255, 255, 255, 255)
@@ -237,20 +237,49 @@ class FluidTetrisView @JvmOverloads constructor(
 
             val buttonWidth = 320f
             val buttonHeight = 120f
-            val resumeX = (width - buttonWidth) / 2
-            val resumeY = height / 2 + 200f
+            val buttonGap = 30f
+            val totalWidth = 3 * buttonWidth + 2 * buttonGap
+            val startX = (width - totalWidth) / 2
+            val newGameX = startX
+            val resumeX = startX + buttonWidth + buttonGap
+            val exitX = startX + 2 * (buttonWidth + buttonGap)
+            val buttonY = height / 2 + 200f
 
-            paint.color = Color.argb(220, 100, 180, 150)
-            canvas.drawRect(resumeX, resumeY, resumeX + buttonWidth, resumeY + buttonHeight, paint)
+            paint.color = Color.argb(220, 80, 180, 150)
+            canvas.drawRect(newGameX, buttonY, newGameX + buttonWidth, buttonY + buttonHeight, paint)
             paint.color = Color.argb(255, 255, 255, 255)
             paint.textSize = 50f
-            canvas.drawText("Resume", resumeX + 60f, resumeY + 80f, paint)
+            canvas.drawText("New Game", newGameX + 20f, buttonY + 80f, paint)
+
+            paint.color = Color.argb(220, 100, 180, 150)
+            canvas.drawRect(resumeX, buttonY, resumeX + buttonWidth, buttonY + buttonHeight, paint)
+            paint.color = Color.argb(255, 255, 255, 255)
+            canvas.drawText("Resume", resumeX + 60f, buttonY + 80f, paint)
+
+            paint.color = Color.argb(220, 180, 80, 80)
+            canvas.drawRect(exitX, buttonY, exitX + buttonWidth, buttonY + buttonHeight, paint)
+            paint.color = Color.argb(255, 255, 255, 255)
+            canvas.drawText("Exit", exitX + 100f, buttonY + 80f, paint)
+        }
+
+        if (engine.isPaused) {
+            paint.color = Color.argb(200, 80, 120, 150)
+            canvas.drawRect(10f, 170f, 280f, 270f, paint)
+            paint.color = Color.argb(255, 200, 240, 230)
+            paint.textSize = 48f
+            val soundText = if (soundManager.enabled) "🔊" else "🔇"
+            canvas.drawText(soundText, 110f, 235f, paint)
         }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                if (event.x in 10f..280f && event.y in 170f..270f) {
+                    soundManager.enabled = !soundManager.enabled
+                    invalidate()
+                    return true
+                }
                 if (engine.isGameOver) {
                     val buttonWidth = 320f
                     val buttonHeight = 120f
@@ -273,22 +302,31 @@ class FluidTetrisView @JvmOverloads constructor(
                 if (engine.isPaused && !engine.isGameOver) {
                     val buttonWidth = 320f
                     val buttonHeight = 120f
-                    val resumeX = (width - buttonWidth) / 2
-                    val resumeY = height / 2 + 200f
+                    val buttonGap = 30f
+                    val totalWidth = 3 * buttonWidth + 2 * buttonGap
+                    val startX = (width - totalWidth) / 2
+                    val newGameX = startX
+                    val resumeX = startX + buttonWidth + buttonGap
+                    val exitX = startX + 2 * (buttonWidth + buttonGap)
+                    val buttonY = height / 2 + 200f
 
-                    if (event.x in resumeX..(resumeX + buttonWidth) && event.y in resumeY..(resumeY + buttonHeight)) {
+                    if (event.x in newGameX..(newGameX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
+                        engine.resetGame(width, height)
+                        invalidate()
+                        return true
+                    }
+                    if (event.x in resumeX..(resumeX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
                         engine.resume()
                         invalidate()
+                        return true
+                    }
+                    if (event.x in exitX..(exitX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
+                        gameListener?.onExitPressed()
                         return true
                     }
                     return true
                 }
                 if (!engine.isPaused && engine.onTouchDown(event.x, event.y)) {
-                    return true
-                }
-                if (event.x in 10f..280f && event.y in 170f..270f) {
-                    soundManager.enabled = !soundManager.enabled
-                    invalidate()
                     return true
                 }
                 if (event.x in 20f..200f && event.y in (height - 150f)..(height - 50f)) {
@@ -308,9 +346,9 @@ class FluidTetrisView @JvmOverloads constructor(
                 if (!engine.isPaused && !engine.isGameOver) {
                     val buttonSize = NEXT_BUTTON_SQUARED_SIZE
                     val leftButtonX = 20f
-                    val leftButtonY = height - 310f
+                    val leftButtonY = height / 2 - buttonSize / 2
                     val rightButtonX = width - 20f - buttonSize
-                    val rightButtonY = height - 310f
+                    val rightButtonY = height / 2 - buttonSize / 2
 
                     if ((event.x in leftButtonX..(leftButtonX + buttonSize) && event.y in leftButtonY..(leftButtonY + buttonSize)) ||
                         (event.x in rightButtonX..(rightButtonX + buttonSize) && event.y in rightButtonY..(rightButtonY + buttonSize))) {
