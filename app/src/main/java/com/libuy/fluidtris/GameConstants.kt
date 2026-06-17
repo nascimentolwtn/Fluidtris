@@ -25,8 +25,7 @@ internal object GameConstants {
     const val GRID_TOP = 100f
     const val GRID_RIGHT_MARGIN = 150f
     const val GRID_BOTTOM_MARGIN = 180f
-    const val NEXT_BUTTON_WIDTH = 160f
-    const val NEXT_BUTTON_HEIGHT = 80f
+    const val NEXT_BUTTON_SQUARED_SIZE = 140f
 
     val PIECES: List<List<List<Int>>> = listOf(
         listOf(listOf(1, 1, 1, 1)),              // I

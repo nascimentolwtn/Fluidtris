@@ -154,17 +154,26 @@ class FluidTetrisView @JvmOverloads constructor(
             engine.nextPieceColor, 1f, previewBlockSize)
         canvas.restore()
 
-        // Next button (below preview)
+        // Next buttons (left and right, above New Game and Exit)
         if (!engine.isGameOver && !engine.isPaused) {
-            val nextButtonLeft = previewX - 8f
-            val nextButtonTop = previewY + previewBoxSize + 16f
-            val nextButtonRight = nextButtonLeft + GameConstants.NEXT_BUTTON_WIDTH
-            val nextButtonBottom = nextButtonTop + GameConstants.NEXT_BUTTON_HEIGHT
+            val buttonSize = GameConstants.NEXT_BUTTON_SQUARED_SIZE
+
+            // Left button (above New Game)
+            val leftButtonX = 20f
+            val leftButtonY = height - 310f
             paint.color = Color.argb(200, 80, 150, 100)
-            canvas.drawRect(nextButtonLeft, nextButtonTop, nextButtonRight, nextButtonBottom, paint)
+            canvas.drawRect(leftButtonX, leftButtonY, leftButtonX + buttonSize, leftButtonY + buttonSize, paint)
             paint.color = Color.argb(255, 255, 255, 255)
-            paint.textSize = 40f
-            canvas.drawText("Next", nextButtonLeft + 45f, nextButtonTop + 55f, paint)
+            paint.textSize = 44f
+            canvas.drawText("Next", leftButtonX + 25f, leftButtonY + 90f, paint)
+
+            // Right button (above Exit)
+            val rightButtonX = width - 20f - buttonSize
+            val rightButtonY = height - 310f
+            paint.color = Color.argb(200, 80, 150, 100)
+            canvas.drawRect(rightButtonX, rightButtonY, rightButtonX + buttonSize, rightButtonY + buttonSize, paint)
+            paint.color = Color.argb(255, 255, 255, 255)
+            canvas.drawText("Next", rightButtonX + 25f, rightButtonY + 90f, paint)
         }
 
         paint.color = Color.argb(180, 20, 60, 100)
@@ -319,16 +328,16 @@ class FluidTetrisView @JvmOverloads constructor(
                     gameListener?.onExitPressed()
                     return true
                 }
-                // Next button touch detection
+                // Next button touch detection (left and right)
                 if (!engine.isPaused && !engine.isGameOver) {
-                    val previewBoxSize = 160f
-                    val previewX = width - previewBoxSize - 20f
-                    val previewY = 20f
-                    val nextButtonLeft = previewX - 8f
-                    val nextButtonTop = previewY + previewBoxSize + 16f
-                    val nextButtonRight = nextButtonLeft + GameConstants.NEXT_BUTTON_WIDTH
-                    val nextButtonBottom = nextButtonTop + GameConstants.NEXT_BUTTON_HEIGHT
-                    if (event.x in nextButtonLeft..nextButtonRight && event.y in nextButtonTop..nextButtonBottom) {
+                    val buttonSize = GameConstants.NEXT_BUTTON_SQUARED_SIZE
+                    val leftButtonX = 20f
+                    val leftButtonY = height - 310f
+                    val rightButtonX = width - 20f - buttonSize
+                    val rightButtonY = height - 310f
+
+                    if ((event.x in leftButtonX..(leftButtonX + buttonSize) && event.y in leftButtonY..(leftButtonY + buttonSize)) ||
+                        (event.x in rightButtonX..(rightButtonX + buttonSize) && event.y in rightButtonY..(rightButtonY + buttonSize))) {
                         engine.onNextPieceButton(width, height)
                         invalidate()
                         return true

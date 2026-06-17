@@ -57,6 +57,7 @@ The entire game logic is contained in just two files:
   - Swipe top half of piece → clockwise rotation
   - Swipe bottom half → counter-clockwise rotation
 - **Smart Locking**: 3-second timer when piece contacts bottom or other pieces
+- **Next Button**: Most engaging feature! Two large squared buttons let you skip the current piece and advance to the next one immediately — one positioned above "New Game" (left side) for left-handed players, one above "Exit" (right side) for right-handed players. Disabled during pause and game over
 
 ### Grid System
 - **Dimensions**: 7 columns × 20 rows

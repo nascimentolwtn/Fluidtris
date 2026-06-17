@@ -46,6 +46,8 @@ The game is split across six files:
 
 **Touch input**: Dragging a center block moves the piece; dragging a non-center block rotates it. Rotation uses a torque formula (cross product of block→center vector with drag delta). All pixel-space collision and wall checks use `rotatedBlockCenters()`, which mirrors the `canvas.rotate()` transform exactly.
 
+**Next Piece Button**: A player-friendly feature that advances the falling piece to its successor without waiting for natural lock. Available as two conveniently positioned large squared buttons: one above the "New Game" button (left side) for left-handed players, and one above the "Exit" button (right side) for right-handed players. Disabled during pause and game over states. The next piece preview (shown above the buttons) rotates to show the next piece's orientation, letting players plan ahead.
+
 **Sound**: `move_sound.ogg` (line clear), `rigid_sound.wav` (piece lock). Loaded from `res/raw/`.
 
 **Rendering**: Imperative `Canvas` drawing in `onDraw()`. Pieces draw as jelly rounded-rects that shrink toward crisp squares as `getCollisionSolidity()` rises from 0→1 during the lock countdown. Background image fills the screen. Next-piece preview renders a colored square.
