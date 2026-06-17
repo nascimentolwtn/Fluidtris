@@ -7,7 +7,8 @@ import kotlin.random.Random
 internal class GameEngine(
     private val onPieceLocked: () -> Unit,
     private val onLineCleared: () -> Unit,
-    private val onHighScoreBeat: (newScore: Int) -> Unit = {}
+    private val onHighScoreBeat: (newScore: Int) -> Unit = {},
+    private val onLevelUp: () -> Unit = {}
 ) {
     val grid = Array(GameConstants.GRID_ROWS) { Array<Int?>(GameConstants.GRID_COLUMNS) { null } }
     var score = 0
@@ -31,6 +32,7 @@ internal class GameEngine(
     var isGameOver = true  // stays true until resetGame() is called with real dimensions
     var wasManuallyPausedBeforeSystemPause = false
     var justBeatHighScore = false
+    var isBeatingHighScore = false
 
     var currentPiece = 0
     var currentPieceColor = GameConstants.PIECE_COLORS[0]
@@ -128,6 +130,7 @@ internal class GameEngine(
         bounceCount = 0
         isSnapAnimating = false
         justBeatHighScore = false
+        isBeatingHighScore = false
 
         currentPiece = Random.nextInt(GameConstants.PIECES.size)
         currentPieceColor = GameConstants.PIECE_COLORS[currentPiece]
@@ -430,6 +433,7 @@ internal class GameEngine(
             }
         }
         if (linesCleared > 0) {
+            val prevLevel = getLevel()
             val points = when (linesCleared) {
                 1 -> 100
                 2 -> 300
@@ -438,6 +442,11 @@ internal class GameEngine(
                 else -> linesCleared * 100
             }
             score += points
+            val newLevel = getLevel()
+            if (newLevel > prevLevel) {
+                onLevelUp()
+            }
+            isBeatingHighScore = score > highScore
             if (score > highScore) {
                 highScore = score
                 justBeatHighScore = true

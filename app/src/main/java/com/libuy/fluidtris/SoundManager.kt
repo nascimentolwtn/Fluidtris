@@ -14,6 +14,10 @@ internal class SoundManager(private val context: Context) {
         if (enabled) play(R.raw.rigid_sound)
     }
 
+    fun playLevelUpSound() {
+        if (enabled) play(R.raw.level_up_sound)
+    }
+
     private fun play(resId: Int) {
         try {
             val mp = MediaPlayer.create(context, resId)

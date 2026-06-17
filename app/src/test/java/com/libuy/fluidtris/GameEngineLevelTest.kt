@@ -121,4 +121,51 @@ class GameEngineLevelTest {
         assertEquals("Level 4 should have 4x gravity multiplier", true, distanceAtLevel4 > distanceAtLevel1)
     }
 
+    @Test
+    fun levelUpCallbackTriggeredOnLineCleared() {
+        var fakeTimeMs = 0L
+        var levelUpCount = 0
+        val e = GameEngine(
+            onPieceLocked = {},
+            onLineCleared = {},
+            onLevelUp = { levelUpCount++ }
+        )
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+
+        // Start with score at 900 (level 1)
+        e.score = 900
+        assertEquals("Initial level should be 1", 1, e.getLevel())
+        assertEquals("Level up should not have been called", 0, levelUpCount)
+
+        val cellWidth = (VW - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
+        val cellHeight = (VH - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
+
+        // Fill bottom row to trigger line clear
+        for (col in 0 until GameConstants.GRID_COLUMNS - 1) {
+            e.grid[GameConstants.GRID_ROWS - 1][col] = 0xFF0000
+        }
+
+        // Position I-piece to complete the line
+        e.currentPiece = 0  // I-piece
+        e.pieceY = GameConstants.GRID_TOP + cellHeight * 2
+        e.pieceX = GameConstants.GRID_LEFT + cellWidth * (GameConstants.GRID_COLUMNS - 2)
+        e.pieceRotation = 90f
+
+        // Simulate until line is cleared and score crosses 1000
+        val maxIterations = 10_000
+        var iterations = 0
+        while (!e.isGameOver && iterations < maxIterations) {
+            fakeTimeMs += 16L
+            e.update(VW, VH)
+            iterations++
+
+            if (e.score > 900) break
+        }
+
+        // Verify level up callback was called
+        assertEquals("Level up callback should have been called", 1, levelUpCount)
+        assertEquals("Level should be 2", 2, e.getLevel())
+    }
+
 }
