@@ -132,6 +132,21 @@ class FluidTetrisView @JvmOverloads constructor(
             engine.currentPieceColor, solidity, fluidBlockSize)
         canvas.restore()
 
+        // Draw other falling pieces
+        for (otherPiece in engine.otherFallingPieces) {
+            val otherShape = GameConstants.PIECES[otherPiece.type]
+            val otherDrawOffsetX = otherShape[0].size * (pieceSize - fluidBlockSize) / 2f
+            val otherDrawOffsetY = otherShape.size * (pieceSize - fluidBlockSize) / 2f
+            canvas.save()
+            canvas.rotate(otherPiece.rotation,
+                otherPiece.x + (otherShape[0].size * pieceSize) / 2,
+                otherPiece.y + (otherShape.size * pieceSize) / 2)
+            drawJellyPiece(canvas, otherShape,
+                otherPiece.x + otherDrawOffsetX, otherPiece.y + otherDrawOffsetY,
+                otherPiece.color, 0f, fluidBlockSize)
+            canvas.restore()
+        }
+
         val nextShape = GameConstants.PIECES[engine.nextPiece]
         val previewBlockSize = 50f
         val previewCols = nextShape[0].size
@@ -232,6 +247,17 @@ class FluidTetrisView @JvmOverloads constructor(
             paint.color = Color.argb(255, 150, 200, 220)
             paint.textSize = 80f
             canvas.drawText("PAUSED", width / 2 - 200f, height / 2 - 50f, paint)
+
+            val buttonWidth = 320f
+            val buttonHeight = 120f
+            val resumeX = (width - buttonWidth) / 2
+            val resumeY = height / 2 + 200f
+
+            paint.color = Color.argb(220, 100, 180, 150)
+            canvas.drawRect(resumeX, resumeY, resumeX + buttonWidth, resumeY + buttonHeight, paint)
+            paint.color = Color.argb(255, 255, 255, 255)
+            paint.textSize = 50f
+            canvas.drawText("Resume", resumeX + 60f, resumeY + 80f, paint)
         }
     }
 
@@ -254,6 +280,19 @@ class FluidTetrisView @JvmOverloads constructor(
                     }
                     if (event.x in exitX..(exitX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
                         gameListener?.onExitPressed()
+                        return true
+                    }
+                    return true
+                }
+                if (engine.isPaused && !engine.isGameOver) {
+                    val buttonWidth = 320f
+                    val buttonHeight = 120f
+                    val resumeX = (width - buttonWidth) / 2
+                    val resumeY = height / 2 + 200f
+
+                    if (event.x in resumeX..(resumeX + buttonWidth) && event.y in resumeY..(resumeY + buttonHeight)) {
+                        engine.isPaused = false
+                        invalidate()
                         return true
                     }
                     return true
