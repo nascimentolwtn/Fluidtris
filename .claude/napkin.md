@@ -1,6 +1,6 @@
 # Napkin Runbook
 
-## Curation Rules
+## v2.4 - Curation Rules
 - Re-prioritize on every read.
 - Keep recurring, high-value notes only.
 - Max 10 items per category.
@@ -55,7 +55,11 @@
 3. **[2026-06-15] Feature: add ads**
    Do instead: integrate ad framework (Google Mobile Ads SDK). Show ads at three points: (a) mid-game banner/interstitial, (b) during pause menu, (c) during game-over screen. Define placement strategy and frequency.
 
+4. **[2026-06-17] Feature: "Next" button to skip ahead**
+   Do instead: add a button below the next-piece preview square labeled "Next". Clicking it spawns the next piece. Button should be tapable and disabled/grayed when no piece is active or game is over. Add `onNextPieceButton()` method to `GameEngine` that calls `spawnNextPiece()` directly; wire the button tap in `FluidTetrisView.onTouchEvent()` or add a dedicated touch rect for the button in `onDraw()`.
+
 ## Done
+- **[2026-06-17] Feature: unified level multiplier affects gravity** — `getLevelMultiplier()` returns `(1 + (level - 1) * LEVEL_DIFFICULTY_FACTOR).coerceAtMost(MAX_LEVEL_MULTIPLIER)` where level = score / 1000 + 1. Applies to gravity scaling: pieces fall progressively faster at higher levels. Constants `LEVEL_DIFFICULTY_FACTOR=0.3f` and `MAX_LEVEL_MULTIPLIER=3f` in `GameConstants`. Public `getLevel()` getter. Unit test `GameEngineLevelTest` covers level progression, multiplier scaling, and gravity increase with 4 tests. All 161 tests pass.
 - **[2026-06-15] Feature: gravity increases with score (each 1000 points)** — formula: `GRAVITY * (1 + score / 1000 * 0.5)` capped at 3x base gravity. Each 1000 points increases falling speed by 50%, making the game progressively harder. Implemented in `GameEngine.update()` line 60. All tests pass.
 - **[2026-06-15] Feature: Exit button on game-over + player name on high score** — Exit button (red) next to New Game on game-over screen. AlertDialog asks for player name only when game ends with new high score. Name pre-selected for easy replacement. Score text turns yellow on new high score. All 130 tests pass. Committed `e11840d`.
 - **[2026-06-15] Fix: spurious upward push in moveUpUntilClear** — `doesPieceCollideWithGridAtY` used axis-aligned ±50 corners (too wide vs cellHeight=82), causing unnecessary pushes on piece-on-piece lock path. Replaced with center-based detection. Regression test: L@45° on pre-filled row 17 locks at row 16. 130 tests pass. Committed `1a705df`.

@@ -57,7 +57,7 @@ internal class GameEngine(
         if (viewWidth == 0 || viewHeight == 0) return
         if (!isPaused && !isGameOver) {
             if (!isWaitingToTurnRigidAtBottom && !isWaitingToTurnRigidAtPiece && !isDragging) {
-                val scaledGravity = GameConstants.GRAVITY * (1 + score / 1000 * 0.5f).coerceAtMost(3f)
+                val scaledGravity = GameConstants.GRAVITY * getLevelMultiplier()
                 pieceY += scaledGravity
             }
 
@@ -226,6 +226,13 @@ internal class GameEngine(
         val t = (elapsed / GameConstants.LOCK_DELAY_MS.toFloat()).coerceIn(0f, 1f)
         val oscillation = sin(t * Math.PI * 6.0).toFloat()
         return (t + oscillation * (1f - t) * 0.6f).coerceIn(0f, 1f)
+    }
+
+    fun getLevel(): Int = score / 1000 + 1
+
+    private fun getLevelMultiplier(): Float {
+        val level = score / 1000 + 1
+        return (1 + (level - 1) * GameConstants.LEVEL_DIFFICULTY_FACTOR).coerceAtMost(GameConstants.MAX_LEVEL_MULTIPLIER)
     }
 
     private fun keepPiecesInsideWalls(viewWidth: Int) {
