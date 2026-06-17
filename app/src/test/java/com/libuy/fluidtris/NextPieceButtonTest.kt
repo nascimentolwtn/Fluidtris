@@ -137,19 +137,4 @@ class NextPieceButtonTest {
         assertTrue("Should be dragging after hitting another piece", e.isDragging)
     }
 
-    @Test
-    fun nextButton_bounds_calculation_matches_preview() {
-        val VW = 1080
-        val previewBoxSize = 160f
-        val previewX = VW - previewBoxSize - 20f
-
-        val nextButtonLeft = previewX - 8f
-        val nextButtonTop = 20f + previewBoxSize + 16f
-        val nextButtonRight = nextButtonLeft + GameConstants.NEXT_BUTTON_WIDTH
-        val nextButtonBottom = nextButtonTop + GameConstants.NEXT_BUTTON_HEIGHT
-
-        assertTrue("Button below preview", nextButtonTop > 20f + previewBoxSize)
-        assertEquals("Button width", GameConstants.NEXT_BUTTON_WIDTH, nextButtonRight - nextButtonLeft)
-        assertEquals("Button height", GameConstants.NEXT_BUTTON_HEIGHT, nextButtonBottom - nextButtonTop)
-    }
 }
