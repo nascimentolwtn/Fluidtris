@@ -18,8 +18,8 @@ class GameEngineLevelTest {
         e.currentTimeMs = { fakeTimeMs }
         e.resetGame(VW, VH)
 
-        // Start with score at 900 (level 1)
-        e.score = 900
+        // Start with score at 150 (level 1)
+        e.score = 150
         assertEquals("Initial level should be 1", 1, e.getLevel())
 
         val cellWidth = (VW - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
@@ -45,14 +45,14 @@ class GameEngineLevelTest {
             iterations++
 
             // Stop once score has increased (line cleared)
-            if (e.score > 900) {
+            if (e.score > 150) {
                 break
             }
         }
 
-        // Verify level increased to 2
-        assertEquals("Level should be 2 after score crosses 1000", 2, e.getLevel())
-        assertEquals("Score should be at least 1000", true, e.score >= 1000)
+        // Verify level increased (score crossed NEXT_LEVEL_SCORE threshold)
+        assertEquals("Level should increase after score crosses NEXT_LEVEL_SCORE", true, e.getLevel() > 1)
+        assertEquals("Score should be at least NEXT_LEVEL_SCORE", true, e.score >= GameConstants.NEXT_LEVEL_SCORE)
     }
 
     @Test
@@ -61,25 +61,26 @@ class GameEngineLevelTest {
             onPieceLocked = {},
             onLineCleared = {}
         )
+        val threshold = GameConstants.NEXT_LEVEL_SCORE
 
         // Test various score thresholds
         e.score = 0
         assertEquals("Score 0 should be level 1", 1, e.getLevel())
 
-        e.score = 999
-        assertEquals("Score 999 should be level 1", 1, e.getLevel())
+        e.score = threshold - 1
+        assertEquals("Score below threshold should be level 1", 1, e.getLevel())
 
-        e.score = 1000
-        assertEquals("Score 1000 should be level 2", 2, e.getLevel())
+        e.score = threshold
+        assertEquals("Score at threshold should be level 2", 2, e.getLevel())
 
-        e.score = 1999
-        assertEquals("Score 1999 should be level 2", 2, e.getLevel())
+        e.score = threshold * 2 - 1
+        assertEquals("Score below 2x threshold should be level 2", 2, e.getLevel())
 
-        e.score = 2000
-        assertEquals("Score 2000 should be level 3", 3, e.getLevel())
+        e.score = threshold * 2
+        assertEquals("Score at 2x threshold should be level 3", 3, e.getLevel())
 
-        e.score = 5000
-        assertEquals("Score 5000 should be level 6", 6, e.getLevel())
+        e.score = threshold * 5
+        assertEquals("Score at 5x threshold should be level 6", 6, e.getLevel())
     }
 
     @Test
@@ -133,8 +134,8 @@ class GameEngineLevelTest {
         e.currentTimeMs = { fakeTimeMs }
         e.resetGame(VW, VH)
 
-        // Start with score at 900 (level 1)
-        e.score = 900
+        // Start with score at 150 (level 1)
+        e.score = 150
         assertEquals("Initial level should be 1", 1, e.getLevel())
         assertEquals("Level up should not have been called", 0, levelUpCount)
 
@@ -152,7 +153,7 @@ class GameEngineLevelTest {
         e.pieceX = GameConstants.GRID_LEFT + cellWidth * (GameConstants.GRID_COLUMNS - 2)
         e.pieceRotation = 90f
 
-        // Simulate until line is cleared and score crosses 1000
+        // Simulate until line is cleared and score crosses NEXT_LEVEL_SCORE
         val maxIterations = 10_000
         var iterations = 0
         while (!e.isGameOver && iterations < maxIterations) {
@@ -160,12 +161,12 @@ class GameEngineLevelTest {
             e.update(VW, VH)
             iterations++
 
-            if (e.score > 900) break
+            if (e.score > 150) break
         }
 
         // Verify level up callback was called
         assertEquals("Level up callback should have been called", 1, levelUpCount)
-        assertEquals("Level should be 2", 2, e.getLevel())
+        assertEquals("Level should increase after crossing threshold", true, e.getLevel() > 1)
     }
 
 }

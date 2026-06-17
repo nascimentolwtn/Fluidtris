@@ -19,6 +19,7 @@ internal object GameConstants {
     const val SNAP_ROTATION_SPEED = 0.96f  // rotation: per-frame lerp strength at t=1 (linear ramp)
     const val LEVEL_DIFFICULTY_FACTOR = 0.3f // multiplier increase per level
     const val MAX_LEVEL_MULTIPLIER = 3f      // cap on level multiplier
+    const val NEXT_LEVEL_SCORE = 200 // score points needed per level (default: 1000)
     const val GAME_LOOP_INTERVAL_MS = 16L
     const val GRID_LEFT = 150f
     const val GRID_TOP = 100f
