@@ -46,7 +46,7 @@ internal class GameEngine(
 
     var isPaused = false
     var isGameOver = true
-    var wasManuallyPausedBeforeSystemPause = false
+    private var wasManuallyPausedBeforeSystemPause = false
     var justBeatHighScore = false
     var isBeatingHighScore = false
 
@@ -279,6 +279,19 @@ internal class GameEngine(
     private fun getLevelMultiplier(): Float {
         val level = computeLevel()
         return (1 + (level - 1) * GameConstants.LEVEL_DIFFICULTY_FACTOR).coerceAtMost(GameConstants.MAX_LEVEL_MULTIPLIER)
+    }
+
+    fun pause() { isPaused = true }
+    fun resume() { isPaused = false }
+    fun togglePause() { isPaused = !isPaused }
+
+    fun onFocusLost() {
+        wasManuallyPausedBeforeSystemPause = isPaused
+        isPaused = true
+    }
+
+    fun onFocusGained() {
+        isPaused = wasManuallyPausedBeforeSystemPause
     }
 
     fun onNextPieceButton(viewWidth: Int, viewHeight: Int) {

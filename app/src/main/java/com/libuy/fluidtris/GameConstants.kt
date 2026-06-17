@@ -1,7 +1,5 @@
 package com.libuy.fluidtris
 
-import android.graphics.Color
-
 internal object GameConstants {
     const val GRID_COLUMNS = 7
     const val GRID_ROWS = 20
@@ -20,12 +18,10 @@ internal object GameConstants {
     const val LEVEL_DIFFICULTY_FACTOR = 0.3f // multiplier increase per level
     const val MAX_LEVEL_MULTIPLIER = 3f      // cap on level multiplier
     const val NEXT_LEVEL_SCORE = 200 // score points needed per level (default: 1000)
-    const val GAME_LOOP_INTERVAL_MS = 16L
     const val GRID_LEFT = 150f
     const val GRID_TOP = 100f
     const val GRID_RIGHT_MARGIN = 150f
     const val GRID_BOTTOM_MARGIN = 180f
-    const val NEXT_BUTTON_SQUARED_SIZE = 140f
 
     val PIECES: List<List<List<Int>>> = listOf(
         listOf(listOf(1, 1, 1, 1)),              // I
@@ -38,13 +34,13 @@ internal object GameConstants {
     )
 
     val PIECE_COLORS: List<Int> = listOf(
-        Color.CYAN,    // I
-        Color.YELLOW,  // O
-        Color.MAGENTA, // T
-        Color.RED,     // L
-        Color.BLUE,    // J
-        Color.GREEN,   // S
-        Color.RED      // Z
+        0xFF00FFFF.toInt(), // I – cyan
+        0xFFFFFF00.toInt(), // O – yellow
+        0xFFFF00FF.toInt(), // T – magenta
+        0xFFFF0000.toInt(), // L – red
+        0xFF0000FF.toInt(), // J – blue
+        0xFF00FF00.toInt(), // S – green
+        0xFFFF0000.toInt()  // Z – red
     )
 
     val PIECE_CENTER_CELLS: List<Set<Pair<Int, Int>>> = listOf(

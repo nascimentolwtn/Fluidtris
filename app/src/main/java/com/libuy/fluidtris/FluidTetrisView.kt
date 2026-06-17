@@ -1,6 +1,5 @@
 package com.libuy.fluidtris
 
-import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -14,13 +13,17 @@ import android.os.Looper
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
-import android.widget.EditText
 
 class FluidTetrisView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
+
+    companion object {
+        private const val NEXT_BUTTON_SQUARED_SIZE = 140f
+        private const val GAME_LOOP_INTERVAL_MS = 16L
+    }
 
     interface GameListener {
         fun onExitPressed()
@@ -41,14 +44,12 @@ class FluidTetrisView @JvmOverloads constructor(
         onHighScoreBeat = { newScore -> highScoreManager.saveHighScore(newScore) },
         onLevelUp = { soundManager.playLevelUpSound() }
     )
-    private var pendingNameDialog = false
-
     private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {
         override fun run() {
             engine.update(width, height)
             invalidate()
-            handler.postDelayed(this, GameConstants.GAME_LOOP_INTERVAL_MS)
+            handler.postDelayed(this, GAME_LOOP_INTERVAL_MS)
         }
     }
 
@@ -60,25 +61,6 @@ class FluidTetrisView @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldW: Int, oldH: Int) {
         super.onSizeChanged(w, h, oldW, oldH)
         engine.resetGame(w, h)
-    }
-
-    private fun showHighScoreNameDialog(newScore: Int) {
-        val input = EditText(context).apply {
-            hint = "Enter your name"
-            setText(highScoreManager.loadHighScoreName())
-            selectAll()
-        }
-
-        AlertDialog.Builder(context)
-            .setTitle("New High Score!")
-            .setMessage("Score: $newScore\nEnter your name:")
-            .setView(input)
-            .setPositiveButton("Save") { _, _ ->
-                val name = input.text.toString().trim()
-                highScoreManager.saveHighScoreName(if (name.isEmpty()) "Player" else name)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -156,7 +138,7 @@ class FluidTetrisView @JvmOverloads constructor(
 
         // Next buttons (left and right, above New Game and Exit)
         if (!engine.isGameOver && !engine.isPaused) {
-            val buttonSize = GameConstants.NEXT_BUTTON_SQUARED_SIZE
+            val buttonSize = NEXT_BUTTON_SQUARED_SIZE
 
             // Left button (above New Game)
             val leftButtonX = 20f
@@ -244,10 +226,6 @@ class FluidTetrisView @JvmOverloads constructor(
             paint.color = Color.argb(255, 255, 255, 255)
             canvas.drawText("Exit", exitX + 100f, buttonY + 80f, paint)
 
-            if (engine.justBeatHighScore && !pendingNameDialog) {
-                pendingNameDialog = true
-                showHighScoreNameDialog(engine.score)
-            }
         }
 
         if (engine.isPaused && !engine.isGameOver) {
@@ -283,7 +261,6 @@ class FluidTetrisView @JvmOverloads constructor(
 
                     if (event.x in newGameX..(newGameX + buttonWidth) && event.y in buttonY..(buttonY + buttonHeight)) {
                         engine.resetGame(width, height)
-                        pendingNameDialog = false
                         invalidate()
                         return true
                     }
@@ -300,7 +277,7 @@ class FluidTetrisView @JvmOverloads constructor(
                     val resumeY = height / 2 + 200f
 
                     if (event.x in resumeX..(resumeX + buttonWidth) && event.y in resumeY..(resumeY + buttonHeight)) {
-                        engine.isPaused = false
+                        engine.resume()
                         invalidate()
                         return true
                     }
@@ -316,12 +293,11 @@ class FluidTetrisView @JvmOverloads constructor(
                 }
                 if (event.x in 20f..200f && event.y in (height - 150f)..(height - 50f)) {
                     engine.resetGame(width, height)
-                    pendingNameDialog = false
                     invalidate()
                     return true
                 }
                 if (event.x in (width / 2 - 100f)..(width / 2 + 100f) && event.y in (height - 150f)..(height - 50f)) {
-                    engine.isPaused = !engine.isPaused
+                    engine.togglePause()
                     return true
                 }
                 if (event.x in (width - 200f)..(width - 20f) && event.y in (height - 150f)..(height - 50f)) {
@@ -330,7 +306,7 @@ class FluidTetrisView @JvmOverloads constructor(
                 }
                 // Next button touch detection (left and right)
                 if (!engine.isPaused && !engine.isGameOver) {
-                    val buttonSize = GameConstants.NEXT_BUTTON_SQUARED_SIZE
+                    val buttonSize = NEXT_BUTTON_SQUARED_SIZE
                     val leftButtonX = 20f
                     val leftButtonY = height - 310f
                     val rightButtonX = width - 20f - buttonSize
@@ -363,12 +339,7 @@ class FluidTetrisView @JvmOverloads constructor(
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
-        if (!hasWindowFocus) {
-            engine.wasManuallyPausedBeforeSystemPause = engine.isPaused
-            engine.isPaused = true
-        } else {
-            engine.isPaused = engine.wasManuallyPausedBeforeSystemPause
-        }
+        if (!hasWindowFocus) engine.onFocusLost() else engine.onFocusGained()
     }
 
     private fun drawJellyPiece(
