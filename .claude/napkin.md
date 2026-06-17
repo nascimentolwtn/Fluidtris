@@ -37,8 +37,8 @@
    Do instead: `GameEngine.currentTimeMs` is an injectable `() -> Long` (default `System::currentTimeMillis`). Unit tests inject a fake clock and advance it 16 ms per tick. Never add new `System.currentTimeMillis()` calls directly — use `currentTimeMs()`.
 
 ## Domain Behavior Guardrails
-1. **[2026-06-03] Grid is 7×20; margins: left=150f, right=150f, top=100f, bottom=180f**
-   Do instead: derive via `GameConstants.GRID_LEFT/RIGHT_MARGIN/TOP/BOTTOM_MARGIN`; `cellWidth = (w - 300f) / 7`, `cellHeight = (h - 280f) / 20`.
+1. **[2026-06-17] Grid is 8×20; margins: left=100f, right=100f, top=100f, bottom=180f**
+   Do instead: derive via `GameConstants.GRID_LEFT/RIGHT_MARGIN/TOP/BOTTOM_MARGIN`; `cellWidth = (w - 200f) / 8`, `cellHeight = (h - 280f) / 20`. Piece spawn at `(viewWidth/2) - 100f` centers blocks in cols 3–6.
 
 2. **[2026-06-15] Snap animation: target is committed once at contact, timer is guarded**
    Do instead: `beginSnapAnimation()` records `(snapTargetX, snapTargetY, snapTargetRotation)` exactly once when the lock timer starts. `applySnapPull(t)` lerps toward the stored target each frame (linear ramp, X + Y + rotation). The timer is NOT reset by the animation itself moving the piece (even upward). Only user drag to open space cancels the snap (`isDragging && no contact` → `isSnapAnimating = false`).
@@ -47,12 +47,23 @@
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
 ## Backlog
-1. **[2026-06-15] Feature: slide while animating when no collision**
+1. **[2026-06-17] Refactor: add 8th column by reclaiming half-margin each side**
+   Do instead: `GameConstants`: GRID_COLUMNS=8, GRID_LEFT=100f, GRID_RIGHT_MARGIN=100f. `GameEngine`: 3 spawn points change `(viewWidth/2)-50f` → `(viewWidth/2)-100f`. cellWidth shrinks imperceptibly (111→110px). All tests pass unchanged. See plan at `.claude/plans/new-backlog-refactoring-linked-origami.md`.
+
+2. **[2026-06-17] Feature: background music + toggle button**
+   Do instead: add looping CC0 ambient audio to `res/raw/bg_music.ogg`. Extend `SoundManager.kt` with `startBgMusic()`, `pauseBgMusic()`, `resumeBgMusic()`, `stopBgMusic()`, `toggleBgMusic(context)`. Add 100×100 button (🎵/🎵🔇) below existing SFX toggle in `FluidTetrisView.kt` at `y: 280–380`. Wire lifecycle: start on `init`, pause/resume on pause overlay, restart on New Game, stop on Exit/detach. See plan at `.claude/plans/new-backlog-add-background-delightful-volcano.md`.
+
+3. **[2026-06-17] Feature: config screen unifies in-game controls**
+   Do instead: replace all scattered buttons (sound/music toggle, next-piece left/right, new-game, exit) with single config button. Config button at sound-toggle position opens overlay with 6 options (2×3 grid). Only pause button remains on play area. Disable config during pause/game-over (only New Game + Exit active at game-over). See plan at `.claude/plans/new-feature-config-screen-unified-controls.md`.
+
+4. **[2026-06-15] Feature: slide while animating when no collision**
    Do instead: during snap animation (lock countdown), allow piece to slide horizontally if there is no block/wall collision ahead. Currently snap animation is rigid; allow user input to push the piece left/right during the countdown if the target position remains open.
-3. **[2026-06-15] Feature: add ads**
+
+5. **[2026-06-15] Feature: add ads**
    Do instead: integrate ad framework (Google Mobile Ads SDK). Show ads at three points: (a) mid-game banner/interstitial, (b) during pause menu, (c) during game-over screen. Define placement strategy and frequency.
 
 ## Done
+- **[2026-06-17] Fix: fluid piece now locks on snap-animating peer** — `canPieceLockCleanly` gained `animatingPeerOccupiesCell(gx, gy+1, ...)` resting check (guarded by `ownCells` so a piece can't "rest on itself"). `livePieceContacts >= 1` branch splits: if `canPieceLockCleanly` returns true, starts lock timer (`isWaitingToTurnRigidAtPiece`) + snap animation; else bounces as before. New test `fluidPieceStartsLockTimerWhenRestingOnAnimatingPeer`. 179 tests pass.
 - **[2026-06-17] Refactor: migrate build to AGP 10.0 compatibility** — enabled `android.builtInKotlin=true` and `android.newDsl=true` in `gradle.properties`; removed explicit Kotlin plugin alias from `app/build.gradle.kts` since AGP applies it automatically; removed deprecated `kotlinOptions` block. Eliminates all 5 Gradle deprecation warnings about variant API removal in AGP 10.0. All 175+ tests pass. Build clean with zero deprecation warnings. Commit `615aa3c`.
 - **[2026-06-17] Fix: line-clear interrupts snap animation** — when a line clears while another piece is in snap animation (mid lock-countdown), the animation is cancelled and the piece returns to fluid state so it can fall naturally. `checkLines()` now returns `Boolean` indicating if lines were cleared. In `turnPieceRigidInternal()`, after `checkLines()` clears lines, iterate through all `fallingPieces` and reset `isSnapAnimating`, `isWaitingToTurnRigidAtBottom`, `isWaitingToTurnRigidAtPiece` to `false`. Unit test `SnapPullTest.lineCleared_whilePieceIsSnapping_cancelsSnapAnimation()` verifies: piece in snap animation gets reset when lines clear. All 175 tests pass.
 - **[2026-06-17] Fix: Unified falling-piece architecture** — replaced `FallingPiece` + single-piece scalar vars (`pieceX/Y/Rotation`, `springForceX`, lock timers, snap state) with `ActivePiece` data class carrying all per-piece state. `fallingPieces: MutableList<ActivePiece>` is the single source of truth; `draggedPiece: ActivePiece?` replaces `isDragging: Boolean`. All pieces now get full gravity + collision + lock timer + snap animation in one unified `update()` loop. `turnPieceRigidInternal(piece)` removes piece from list; spawns from preview only when list empties. Backward-compat properties (`pieceX`, `pieceY`, `currentPiece`, `isDragging`, `otherFallingPieces`) preserve existing test signatures. `onTouchDown()` iterates all pieces so any falling piece is touchable. 173 tests pass.
