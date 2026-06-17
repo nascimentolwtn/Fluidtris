@@ -15,7 +15,7 @@ internal object GameConstants {
     const val BLOCK_INSET = 1.5f        // per-side visual and collision shrink (3px total)
     const val SNAP_PULL_SPEED = 0.72f       // X drift: per-frame lerp strength at t=1 (linear ramp)
     const val SNAP_ROTATION_SPEED = 0.96f  // rotation: per-frame lerp strength at t=1 (linear ramp)
-    const val LEVEL_DIFFICULTY_FACTOR = 0.3f // multiplier increase per level
+    const val LEVEL_DIFFICULTY_FACTOR = 1f // multiplier increase per level
     const val MAX_LEVEL_MULTIPLIER = 3f      // cap on level multiplier
     const val NEXT_LEVEL_SCORE = 300 // score points needed per level (default: 500)
     const val GRID_LEFT = 150f

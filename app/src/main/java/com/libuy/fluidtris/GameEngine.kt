@@ -516,17 +516,28 @@ internal class GameEngine(
             }
             livePieceContacts >= 1 -> {
                 if (!piece.isSnapAnimating) {
-                    piece.isWaitingToTurnRigidAtBottom = false
-                    piece.isWaitingToTurnRigidAtPiece = false
-                    if (!piece.isSlidingOnContact) {
-                        val force = computeSlideForceXFromAnimatingPieces(piece)
-                        piece.slideDirection = if (force >= 0f) 1f else -1f
-                        piece.springForceX = piece.slideDirection * GameConstants.SLIDE_IMPULSE
-                        piece.y -= GameConstants.SLIDE_IMPULSE
-                        piece.rotation += piece.slideDirection * GameConstants.BOUNCE_ROTATION_DEG
-                        piece.isSlidingOnContact = true
+                    if (canPieceLockCleanly(piece, viewWidth, viewHeight)) {
+                        piece.isSlidingOnContact = false
+                        piece.slideDirection = 0f
+                        if (!piece.isWaitingToTurnRigidAtPiece) {
+                            piece.isWaitingToTurnRigidAtPiece = true
+                            piece.pieceCollisionTime = currentTimeMs()
+                            piece.springForceX = 0f
+                            beginSnapAnimation(piece, viewWidth, viewHeight)
+                        }
                     } else {
-                        piece.springForceX = 0f
+                        piece.isWaitingToTurnRigidAtBottom = false
+                        piece.isWaitingToTurnRigidAtPiece = false
+                        if (!piece.isSlidingOnContact) {
+                            val force = computeSlideForceXFromAnimatingPieces(piece)
+                            piece.slideDirection = if (force >= 0f) 1f else -1f
+                            piece.springForceX = piece.slideDirection * GameConstants.SLIDE_IMPULSE
+                            piece.y -= GameConstants.SLIDE_IMPULSE
+                            piece.rotation += piece.slideDirection * GameConstants.BOUNCE_ROTATION_DEG
+                            piece.isSlidingOnContact = true
+                        } else {
+                            piece.springForceX = 0f
+                        }
                     }
                 }
             }
@@ -543,6 +554,17 @@ internal class GameEngine(
         }
     }
 
+    private fun animatingPeerOccupiesCell(gx: Int, gy: Int, exclude: ActivePiece, cellWidth: Float, cellHeight: Float): Boolean {
+        return fallingPieces.any { other ->
+            other !== exclude && other.isSnapAnimating &&
+            rotatedBlockCenters(GameConstants.PIECES[other.type], other.x, other.y, other.rotation)
+                .any { (bx, by) ->
+                    ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt() == gx &&
+                    ((by - GameConstants.GRID_TOP) / cellHeight).toInt() == gy
+                }
+        }
+    }
+
     private fun canPieceLockCleanly(piece: ActivePiece, viewWidth: Int, viewHeight: Int): Boolean {
         val cellWidth  = (viewWidth  - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN)  / GameConstants.GRID_COLUMNS
         val cellHeight = (viewHeight - GameConstants.GRID_TOP  - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
@@ -553,6 +575,11 @@ internal class GameEngine(
         val snappedRotation = (Math.round(normalized / 90f).toInt() % 4) * 90f
 
         val centers = rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, snappedRotation)
+        val ownCells = centers.mapTo(HashSet()) { (bx, by) ->
+            ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt() to
+            ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
+        }
+
         var resting = false
         for ((bx, by) in centers) {
             val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
@@ -562,6 +589,7 @@ internal class GameEngine(
             if (by + GameConstants.PIECE_SIZE / 2f >= gridBottom) resting = true
             else if (gy + 1 >= GameConstants.GRID_ROWS) resting = true
             else if (grid[gy + 1][gx] != null) resting = true
+            else if ((gx to gy + 1) !in ownCells && animatingPeerOccupiesCell(gx, gy + 1, piece, cellWidth, cellHeight)) resting = true
         }
         return resting
     }
