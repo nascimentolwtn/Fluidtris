@@ -18,8 +18,8 @@ class GameEngineLevelTest {
         e.currentTimeMs = { fakeTimeMs }
         e.resetGame(VW, VH)
 
-        // Start with score at 150 (level 1)
-        e.score = 150
+        // Start one line-clear away from NEXT_LEVEL_SCORE so a single clear triggers level-up
+        e.score = GameConstants.NEXT_LEVEL_SCORE - 100
         assertEquals("Initial level should be 1", 1, e.getLevel())
 
         val cellWidth = (VW - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
@@ -36,7 +36,7 @@ class GameEngineLevelTest {
         e.pieceX = GameConstants.GRID_LEFT + cellWidth * (GameConstants.GRID_COLUMNS - 2)
         e.pieceRotation = 90f  // Horizontal orientation
 
-        // Simulate game loop until piece locks
+        val scoreBeforeLine = e.score
         val maxIterations = 10_000
         var iterations = 0
         while (!e.isGameOver && iterations < maxIterations) {
@@ -45,7 +45,7 @@ class GameEngineLevelTest {
             iterations++
 
             // Stop once score has increased (line cleared)
-            if (e.score > 150) {
+            if (e.score > scoreBeforeLine) {
                 break
             }
         }
@@ -134,8 +134,8 @@ class GameEngineLevelTest {
         e.currentTimeMs = { fakeTimeMs }
         e.resetGame(VW, VH)
 
-        // Start with score at 150 (level 1)
-        e.score = 150
+        // Start one line-clear away from NEXT_LEVEL_SCORE so a single clear triggers level-up
+        e.score = GameConstants.NEXT_LEVEL_SCORE - 100
         assertEquals("Initial level should be 1", 1, e.getLevel())
         assertEquals("Level up should not have been called", 0, levelUpCount)
 
@@ -153,7 +153,7 @@ class GameEngineLevelTest {
         e.pieceX = GameConstants.GRID_LEFT + cellWidth * (GameConstants.GRID_COLUMNS - 2)
         e.pieceRotation = 90f
 
-        // Simulate until line is cleared and score crosses NEXT_LEVEL_SCORE
+        val scoreBeforeLine = e.score
         val maxIterations = 10_000
         var iterations = 0
         while (!e.isGameOver && iterations < maxIterations) {
@@ -161,7 +161,7 @@ class GameEngineLevelTest {
             e.update(VW, VH)
             iterations++
 
-            if (e.score > 150) break
+            if (e.score > scoreBeforeLine) break
         }
 
         // Verify level up callback was called
