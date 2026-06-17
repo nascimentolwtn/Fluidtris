@@ -346,7 +346,16 @@ internal class GameEngine(
             }
         }
 
-        checkLines()
+        val linesCleared = checkLines()
+        if (linesCleared) {
+            for (fallingPiece in fallingPieces) {
+                if (fallingPiece.isSnapAnimating) {
+                    fallingPiece.isSnapAnimating = false
+                    fallingPiece.isWaitingToTurnRigidAtBottom = false
+                    fallingPiece.isWaitingToTurnRigidAtPiece = false
+                }
+            }
+        }
 
         if (draggedPiece === piece) draggedPiece = null
         fallingPieces.remove(piece)
@@ -373,7 +382,7 @@ internal class GameEngine(
         nextPieceRotation = Random.nextInt(4) * 90f
     }
 
-    internal fun checkLines() {
+    internal fun checkLines(): Boolean {
         var linesCleared = 0
         var i = GameConstants.GRID_ROWS - 1
         while (i >= 0) {
@@ -398,7 +407,6 @@ internal class GameEngine(
             }
             score += points
             val newLevel = getLevel()
-            if (newLevel > prevLevel) onLevelUp()
             isBeatingHighScore = score > highScore
             if (score > highScore) {
                 highScore = score
@@ -406,7 +414,10 @@ internal class GameEngine(
                 onHighScoreBeat(score)
             }
             onLineCleared()
+            if (newLevel > prevLevel) onLevelUp()
+            return true
         }
+        return false
     }
 
     // ── Backward-compat wrappers (called by tests) ────────────────────────────

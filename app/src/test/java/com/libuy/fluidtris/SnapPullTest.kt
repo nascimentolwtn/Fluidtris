@@ -121,4 +121,57 @@ class SnapPullTest {
         assertEquals("solidity should reset to 0 after drag to open space",
             0f, e.getCollisionSolidity(), 0.001f)
     }
+
+    @Test
+    fun lineCleared_whilePieceIsSnapping_cancelsSnapAnimation() {
+        var fakeTime = 0L
+        var lineCleared = false
+        val e = GameEngine(
+            onPieceLocked = {},
+            onLineCleared = { lineCleared = true }
+        )
+        e.currentTimeMs = { fakeTime }
+        e.resetGame(VW, VH)
+
+        // Manually set up two pieces: one that will lock and clear a line,
+        // and one that's in snap animation that should get cancelled.
+        val piece1 = e.fallingPieces[0]
+        piece1.type = O_PIECE
+        piece1.color = android.graphics.Color.RED
+        piece1.x = O_PIECEx
+        piece1.y = O_PIECEy
+        piece1.rotation = 0f
+
+        // Place grid state that's almost full in row 19 (missing cells at columns 0-1, where piece 1 will lock)
+        for (j in 2 until GameConstants.GRID_COLUMNS) e.grid[19][j] = android.graphics.Color.RED
+
+        // Add a second piece in snap animation state
+        val piece2 = ActivePiece(
+            type = O_PIECE,
+            color = android.graphics.Color.BLUE,
+            x = O_PIECEx + 120f,
+            y = O_PIECEy - 100f,
+            rotation = 0f,
+            isSnapAnimating = true,
+            isWaitingToTurnRigidAtBottom = true,
+            bottomCollisionTime = fakeTime
+        )
+        e.fallingPieces.add(piece2)
+
+        // Verify piece 2 is in snap animation before lock
+        assertTrue("piece 2 should start in snap animation", piece2.isSnapAnimating)
+        assertTrue("piece 2 should be waiting to turn rigid", piece2.isWaitingToTurnRigidAtBottom)
+
+        // Lock piece 1 (which will complete row 19 and clear the line)
+        piece1.isWaitingToTurnRigidAtBottom = true
+        piece1.bottomCollisionTime = fakeTime
+        repeat(200) { fakeTime += 16L; e.update(VW, VH) }
+
+        // Verify the line was cleared
+        assertTrue("line should have been cleared", lineCleared)
+
+        // Verify piece 2's snap animation was cancelled
+        assertFalse("piece 2 snap animation should be cancelled after line clear", piece2.isSnapAnimating)
+        assertFalse("piece 2 should not be waiting to turn rigid after line clear", piece2.isWaitingToTurnRigidAtBottom)
+    }
 }
