@@ -47,22 +47,18 @@
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
 ## Backlog
-1. **[2026-06-17] Refactor: add 8th column by reclaiming half-margin each side**
-   Do instead: `GameConstants`: GRID_COLUMNS=8, GRID_LEFT=100f, GRID_RIGHT_MARGIN=100f. `GameEngine`: 3 spawn points change `(viewWidth/2)-50f` → `(viewWidth/2)-100f`. cellWidth shrinks imperceptibly (111→110px). All tests pass unchanged. See plan at `.claude/plans/new-backlog-refactoring-linked-origami.md`.
-
-2. **[2026-06-17] Feature: background music + toggle button**
-   Do instead: add looping CC0 ambient audio to `res/raw/bg_music.ogg`. Extend `SoundManager.kt` with `startBgMusic()`, `pauseBgMusic()`, `resumeBgMusic()`, `stopBgMusic()`, `toggleBgMusic(context)`. Add 100×100 button (🎵/🎵🔇) below existing SFX toggle in `FluidTetrisView.kt` at `y: 280–380`. Wire lifecycle: start on `init`, pause/resume on pause overlay, restart on New Game, stop on Exit/detach. See plan at `.claude/plans/new-backlog-add-background-delightful-volcano.md`.
-
-3. **[2026-06-17] Feature: config screen unifies in-game controls**
+1. **[2026-06-17] Feature: config screen unifies in-game controls**
    Do instead: replace all scattered buttons (sound/music toggle, next-piece left/right, new-game, exit) with single config button. Config button at sound-toggle position opens overlay with 6 options (2×3 grid). Only pause button remains on play area. Disable config during pause/game-over (only New Game + Exit active at game-over). See plan at `.claude/plans/new-feature-config-screen-unified-controls.md`.
 
-4. **[2026-06-15] Feature: slide while animating when no collision**
+3. **[2026-06-15] Feature: slide while animating when no collision**
    Do instead: during snap animation (lock countdown), allow piece to slide horizontally if there is no block/wall collision ahead. Currently snap animation is rigid; allow user input to push the piece left/right during the countdown if the target position remains open.
 
-5. **[2026-06-15] Feature: add ads**
+4. **[2026-06-15] Feature: add ads**
    Do instead: integrate ad framework (Google Mobile Ads SDK). Show ads at three points: (a) mid-game banner/interstitial, (b) during pause menu, (c) during game-over screen. Define placement strategy and frequency.
 
 ## Done
+- **[2026-06-17] Feature: background music + toggle button** — Added `SoundManager.startBgMusic()`, `pauseBgMusic()`, `resumeBgMusic()`, `stopBgMusic()`, `toggleBgMusic(context)` with `bgMusicEnabled` flag and looping `MediaPlayer`. `FluidTetrisView` renders 🎵/🎵🔇 button at y: 280–380 below SFX toggle; wired lifecycle: start on `init`, pause/resume on pause overlay toggle, restart on New Game, stop on Exit/detach. Audio file at `res/raw/bg_music.ogg` (placeholder; user can replace with preferred CC0 track). All gameplay features unchanged.
+- **[2026-06-17] Refactor: add 8th column** — `GRID_COLUMNS=8`, `GRID_LEFT/RIGHT_MARGIN=100f`; 3 spawn points shifted `(vw/2)-50f` → `(vw/2)-100f`. Fixed `blockAtExactPieceCell_true` to pin I-piece (Z-piece was flaky at old test). 178 tests pass.
 - **[2026-06-17] Fix: fluid piece now locks on snap-animating peer** — `canPieceLockCleanly` gained `animatingPeerOccupiesCell(gx, gy+1, ...)` resting check (guarded by `ownCells` so a piece can't "rest on itself"). `livePieceContacts >= 1` branch splits: if `canPieceLockCleanly` returns true, starts lock timer (`isWaitingToTurnRigidAtPiece`) + snap animation; else bounces as before. New test `fluidPieceStartsLockTimerWhenRestingOnAnimatingPeer`. 179 tests pass.
 - **[2026-06-17] Refactor: migrate build to AGP 10.0 compatibility** — enabled `android.builtInKotlin=true` and `android.newDsl=true` in `gradle.properties`; removed explicit Kotlin plugin alias from `app/build.gradle.kts` since AGP applies it automatically; removed deprecated `kotlinOptions` block. Eliminates all 5 Gradle deprecation warnings about variant API removal in AGP 10.0. All 175+ tests pass. Build clean with zero deprecation warnings. Commit `615aa3c`.
 - **[2026-06-17] Fix: line-clear interrupts snap animation** — when a line clears while another piece is in snap animation (mid lock-countdown), the animation is cancelled and the piece returns to fluid state so it can fall naturally. `checkLines()` now returns `Boolean` indicating if lines were cleared. In `turnPieceRigidInternal()`, after `checkLines()` clears lines, iterate through all `fallingPieces` and reset `isSnapAnimating`, `isWaitingToTurnRigidAtBottom`, `isWaitingToTurnRigidAtPiece` to `false`. Unit test `SnapPullTest.lineCleared_whilePieceIsSnapping_cancelsSnapAnimation()` verifies: piece in snap animation gets reset when lines clear. All 175 tests pass.

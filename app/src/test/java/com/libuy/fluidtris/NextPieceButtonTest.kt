@@ -69,7 +69,7 @@ class NextPieceButtonTest {
         e.onNextPieceButton(VW, VH)
 
         // New current piece should be at spawn
-        assertEquals("New piece X should be center", (VW / 2).toFloat() - 50f, e.pieceX, 0.1f)
+        assertEquals("New piece X should be center", (VW / 2).toFloat() - 100f, e.pieceX, 0.1f)
         assertEquals("New piece Y should be grid top", GameConstants.GRID_TOP, e.pieceY, 0.1f)
 
         // Old piece should retain its position

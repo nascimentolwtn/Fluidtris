@@ -1,7 +1,7 @@
 package com.libuy.fluidtris
 
 internal object GameConstants {
-    const val GRID_COLUMNS = 7
+    const val GRID_COLUMNS = 8
     const val GRID_ROWS = 20
     const val PIECE_SIZE = 100f
     const val GRAVITY = 2.0f
@@ -18,9 +18,9 @@ internal object GameConstants {
     const val LEVEL_DIFFICULTY_FACTOR = 1f // multiplier increase per level
     const val MAX_LEVEL_MULTIPLIER = 3f      // cap on level multiplier
     const val NEXT_LEVEL_SCORE = 300 // score points needed per level (default: 500)
-    const val GRID_LEFT = 150f
+    const val GRID_LEFT = 100f
     const val GRID_TOP = 100f
-    const val GRID_RIGHT_MARGIN = 150f
+    const val GRID_RIGHT_MARGIN = 100f
     const val GRID_BOTTOM_MARGIN = 180f
 
     val PIECES: List<List<List<Int>>> = listOf(

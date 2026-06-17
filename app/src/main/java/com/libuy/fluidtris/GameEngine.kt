@@ -168,7 +168,7 @@ internal class GameEngine(
         fallingPieces.add(ActivePiece(
             type = pieceType,
             color = GameConstants.PIECE_COLORS[pieceType],
-            x = (viewWidth / 2) - 50f,
+            x = (viewWidth / 2) - 100f,
             y = GameConstants.GRID_TOP,
             rotation = 0f
         ))
@@ -300,7 +300,7 @@ internal class GameEngine(
         val newPiece = ActivePiece(
             type = nextPiece,
             color = nextPieceColor,
-            x = (viewWidth / 2) - 50f,
+            x = (viewWidth / 2) - 100f,
             y = GameConstants.GRID_TOP,
             rotation = nextPieceRotation
         )
@@ -373,7 +373,7 @@ internal class GameEngine(
         fallingPieces.add(0, ActivePiece(
             type = nextPiece,
             color = nextPieceColor,
-            x = (viewWidth / 2) - 50f,
+            x = (viewWidth / 2) - 100f,
             y = GameConstants.GRID_TOP,
             rotation = nextPieceRotation
         ))

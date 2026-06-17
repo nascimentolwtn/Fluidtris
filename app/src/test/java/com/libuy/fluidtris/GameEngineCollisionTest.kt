@@ -69,10 +69,9 @@ class GameEngineCollisionTest {
     @Test
     fun blockAtExactPieceCell_true() {
         val e = engine()
-        // Default I-piece at pieceX=490f, pieceY=100f (0° rotation).
-        // Block (0,0) center at (540, 150). Corner (490, 100):
-        //   cellX = (490 - 150) / cellW = 340 / 111.43 ≈ 3  → grid col 3
-        //   cellY = (100 - 100) / cellH = 0 / 82 = 0          → grid row 0
+        e.currentPiece = 0  // pin I-piece; pieceX=440, block 0 center=490, corner=(440,100)
+        // I-piece at pieceX=440, 0° rotation: block(0,0) center at (490,150).
+        // Top-left corner (440,100): cellX=(440-100)/110=3.09→col 3, cellY=0.
         e.grid[0][3] = Color.RED
         assertTrue(e.isPieceCollidingWithAnotherPiece(cellW, cellH))
     }
