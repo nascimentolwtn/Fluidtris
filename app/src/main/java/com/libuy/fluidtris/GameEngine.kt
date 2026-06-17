@@ -4,6 +4,14 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
+data class FallingPiece(
+    var type: Int,
+    var x: Float,
+    var y: Float,
+    var rotation: Float,
+    var color: Int
+)
+
 internal class GameEngine(
     private val onPieceLocked: () -> Unit,
     private val onLineCleared: () -> Unit,
@@ -55,6 +63,8 @@ internal class GameEngine(
     private var snapTargetY = 0f
     private var snapTargetRotation = 0f
 
+    val otherFallingPieces = mutableListOf<FallingPiece>()
+
     fun update(viewWidth: Int, viewHeight: Int) {
         if (viewWidth == 0 || viewHeight == 0) return
         if (!isPaused && !isGameOver) {
@@ -71,6 +81,20 @@ internal class GameEngine(
 
             keepPiecesInsideWalls(viewWidth)
             checkCollisions(viewWidth, viewHeight)
+
+            // Update other falling pieces with gravity
+            val scaledGravity = GameConstants.GRAVITY * getLevelMultiplier()
+            for (otherPiece in otherFallingPieces) {
+                otherPiece.y += scaledGravity
+                // Clamp other pieces inside walls
+                val otherCenters = rotatedBlockCenters(GameConstants.PIECES[otherPiece.type], otherPiece.x, otherPiece.y, otherPiece.rotation)
+                otherPiece.x = clampPieceXByCenters(
+                    otherCenters, otherPiece.x,
+                    GameConstants.GRID_LEFT,
+                    viewWidth - GameConstants.GRID_RIGHT_MARGIN,
+                    GameConstants.PIECE_SIZE / 2
+                )
+            }
 
             if (!isDragging && isSnapAnimating && (isWaitingToTurnRigidAtBottom || isWaitingToTurnRigidAtPiece)) {
                 val elapsed = when {
@@ -131,6 +155,7 @@ internal class GameEngine(
         isSnapAnimating = false
         justBeatHighScore = false
         isBeatingHighScore = false
+        otherFallingPieces.clear()
 
         currentPiece = Random.nextInt(GameConstants.PIECES.size)
         currentPieceColor = GameConstants.PIECE_COLORS[currentPiece]
@@ -464,6 +489,40 @@ internal class GameEngine(
 
     internal fun lockPieceAtBottom(viewWidth: Int, viewHeight: Int) {
         turnPieceRigid(viewWidth, viewHeight)
+    }
+
+    fun onNextPieceButton(viewWidth: Int, viewHeight: Int) {
+        if (isGameOver || isPaused) return
+        // Move current piece to other falling pieces (it continues falling)
+        otherFallingPieces.add(FallingPiece(
+            type = currentPiece,
+            x = pieceX,
+            y = pieceY,
+            rotation = pieceRotation,
+            color = currentPieceColor
+        ))
+
+        // Spawn next piece as new current piece
+        currentPiece = nextPiece
+        currentPieceColor = nextPieceColor
+        pieceX = (viewWidth / 2) - 50f
+        pieceY = GameConstants.GRID_TOP
+        pieceRotation = nextPieceRotation
+
+        // Reset state for new piece
+        isDragging = false
+        springForceX = 0f
+        isWaitingToTurnRigidAtBottom = false
+        isWaitingToTurnRigidAtPiece = false
+        isSlidingOnContact = false
+        slideDirection = 0f
+        bounceCount = 0
+        isSnapAnimating = false
+
+        // Generate new next piece
+        nextPiece = Random.nextInt(GameConstants.PIECES.size)
+        nextPieceColor = GameConstants.PIECE_COLORS[nextPiece]
+        nextPieceRotation = Random.nextInt(4) * 90f
     }
 
     internal fun isPieceCollidingWithAnotherPiece(cellWidth: Float, cellHeight: Float): Boolean {
