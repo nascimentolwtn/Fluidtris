@@ -418,6 +418,16 @@ class FluidTetrisView @JvmOverloads constructor(
         if (!hasWindowFocus) engine.onFocusLost() else engine.onFocusGained()
     }
 
+    fun onAppPause() {
+        engine.onFocusLost()
+        soundManager.pauseBgMusic()
+    }
+
+    fun onAppResume() {
+        engine.onFocusGained()
+        if (!engine.isPaused) soundManager.resumeBgMusic()
+    }
+
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         soundManager.stopBgMusic()
