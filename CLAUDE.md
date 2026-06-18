@@ -22,6 +22,10 @@ Fluidtris is an Android Tetris-like game with a "fluid" physics twist: pieces ca
 ./gradlew connectedAndroidTest
 ```
 
+## Commit Message Style
+
+Keep messages concise: `type: brief subject` (1–2 lines max, no elaborate body). See global memory for details and examples.
+
 ## Architecture
 
 The game is split across six files:
