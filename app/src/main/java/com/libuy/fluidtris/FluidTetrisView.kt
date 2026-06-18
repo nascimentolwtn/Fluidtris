@@ -199,24 +199,26 @@ class FluidTetrisView @JvmOverloads constructor(
         val bgText = if (soundManager.bgMusicEnabled) "🎵" else "🎵🔇"
         canvas.drawText(bgText, 100f, 345f, paint)
 
-        paint.color = Color.argb(200, 50, 150, 130)
-        canvas.drawRect(20f, height - 150f, 200f, height - 50f, paint)
-        paint.color = Color.argb(255, 200, 240, 230)
-        paint.textSize = 30f
-        canvas.drawText("New Game", 35f, height - 100f, paint)
+        // Bottom buttons (only show when game is active, not paused or over)
+        if (!engine.isPaused && !engine.isGameOver) {
+            paint.color = Color.argb(200, 50, 150, 130)
+            canvas.drawRect(20f, height - 150f, 200f, height - 50f, paint)
+            paint.color = Color.argb(255, 200, 240, 230)
+            paint.textSize = 30f
+            canvas.drawText("New Game", 35f, height - 100f, paint)
 
-        // Pause button (center)
-        paint.color = Color.argb(200, 100, 150, 180)
-        canvas.drawRect(width / 2 - 100f, height - 150f, width / 2 + 100f, height - 50f, paint)
-        paint.color = Color.argb(255, 200, 240, 230)
-        val pauseButtonText = if (engine.isPaused) "Resume" else "Pause"
-        canvas.drawText(pauseButtonText, width / 2 - 70f, height - 100f, paint)
+            // Pause button (center)
+            paint.color = Color.argb(200, 100, 150, 180)
+            canvas.drawRect(width / 2 - 100f, height - 150f, width / 2 + 100f, height - 50f, paint)
+            paint.color = Color.argb(255, 200, 240, 230)
+            canvas.drawText("Pause", width / 2 - 50f, height - 100f, paint)
 
-        // Exit button (right)
-        paint.color = Color.argb(200, 150, 80, 80)
-        canvas.drawRect(width - 200f, height - 150f, width - 20f, height - 50f, paint)
-        paint.color = Color.argb(255, 200, 240, 230)
-        canvas.drawText("Exit", width - 160f, height - 100f, paint)
+            // Exit button (right)
+            paint.color = Color.argb(200, 150, 80, 80)
+            canvas.drawRect(width - 200f, height - 150f, width - 20f, height - 50f, paint)
+            paint.color = Color.argb(255, 200, 240, 230)
+            canvas.drawText("Exit", width - 160f, height - 100f, paint)
+        }
 
         if (engine.isGameOver) {
             paint.color = Color.argb(150, 20, 40, 80)
