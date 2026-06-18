@@ -76,7 +76,7 @@ Game logic is cleanly separated across six specialized files:
 - **Game Over Celebration**: Special audio feedback when the game ends
 
 ### Grid System
-- **Dimensions**: 7 columns × 20 rows
+- **Dimensions**: 8 columns × 20 rows
 - **Cell Sizing**: Dynamic calculation based on screen size
 - **Block Size**: Fixed at 100px for consistent visual appearance
 
@@ -88,10 +88,8 @@ Game logic is cleanly separated across six specialized files:
 
 ## ⚠️ Known Issues & Limitations
 
-| Issue | Description | Status |
-|-------|-------------|--------|
-| High Score Name Tracking | High score stored as plain integer; no player name or date | Open |
-| Next Piece Preview Shape | Preview renders as colored square instead of actual piece shape | Open |
+### Placeholder Audio Files
+Game-over celebration sound and high-score bonus sound are currently sourced from temporary audio assets. Future work should replace `game_over_sound.mp3` and `high_score_cheer.mp3` with appropriately licensed CC0 audio files that match the game's tone.
 
 ## 🎨 Rendering
 
