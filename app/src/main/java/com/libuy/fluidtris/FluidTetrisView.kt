@@ -21,7 +21,6 @@ class FluidTetrisView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     companion object {
-        private const val NEXT_BUTTON_SQUARED_SIZE = 180f
         private const val GAME_LOOP_INTERVAL_MS = 16L
     }
 
@@ -145,26 +144,25 @@ class FluidTetrisView @JvmOverloads constructor(
             engine.nextPieceColor, 1f, previewBlockSize)
         canvas.restore()
 
-        // Next buttons (left and right, vertically centered)
+        // Next buttons (left and right, spanning grid height)
         if (!engine.isGameOver && !engine.isPaused) {
-            val buttonSize = NEXT_BUTTON_SQUARED_SIZE
+            val gridTop = GameConstants.GRID_TOP
+            val gridBottom = height - GameConstants.GRID_BOTTOM_MARGIN
 
             // Left button
-            val leftButtonX = 20f
-            val leftButtonY = height / 2 - buttonSize / 2
+            val leftButtonX = 0f
             paint.color = Color.argb(200, 80, 150, 100)
-            canvas.drawRect(leftButtonX, leftButtonY, leftButtonX + buttonSize, leftButtonY + buttonSize, paint)
+            canvas.drawRect(leftButtonX, gridTop, GameConstants.GRID_LEFT, gridBottom, paint)
             paint.color = Color.argb(255, 255, 255, 255)
-            paint.textSize = 44f
-            canvas.drawText("Next", leftButtonX + 25f, leftButtonY + 90f, paint)
+            paint.textSize = 32f
+            canvas.drawText("N", GameConstants.GRID_LEFT / 2 - 12f, gridTop + (gridBottom - gridTop) / 2 + 12f, paint)
 
             // Right button
-            val rightButtonX = width - 20f - buttonSize
-            val rightButtonY = height / 2 - buttonSize / 2
+            val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
             paint.color = Color.argb(200, 80, 150, 100)
-            canvas.drawRect(rightButtonX, rightButtonY, rightButtonX + buttonSize, rightButtonY + buttonSize, paint)
+            canvas.drawRect(rightButtonX, gridTop, width.toFloat(), gridBottom, paint)
             paint.color = Color.argb(255, 255, 255, 255)
-            canvas.drawText("Next", rightButtonX + 25f, rightButtonY + 90f, paint)
+            canvas.drawText("N", rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2 - 12f, gridTop + (gridBottom - gridTop) / 2 + 12f, paint)
         }
 
         paint.color = Color.argb(180, 20, 60, 100)
@@ -380,16 +378,14 @@ class FluidTetrisView @JvmOverloads constructor(
                     gameListener?.onExitPressed()
                     return true
                 }
-                // Next button touch detection (left and right)
+                // Next button touch detection (left and right side buttons)
                 if (!engine.isPaused && !engine.isGameOver) {
-                    val buttonSize = NEXT_BUTTON_SQUARED_SIZE
-                    val leftButtonX = 20f
-                    val leftButtonY = height / 2 - buttonSize / 2
-                    val rightButtonX = width - 20f - buttonSize
-                    val rightButtonY = height / 2 - buttonSize / 2
+                    val gridTop = GameConstants.GRID_TOP
+                    val gridBottom = height - GameConstants.GRID_BOTTOM_MARGIN
+                    val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
 
-                    if ((event.x in leftButtonX..(leftButtonX + buttonSize) && event.y in leftButtonY..(leftButtonY + buttonSize)) ||
-                        (event.x in rightButtonX..(rightButtonX + buttonSize) && event.y in rightButtonY..(rightButtonY + buttonSize))) {
+                    if ((event.x in 0f..GameConstants.GRID_LEFT && event.y in gridTop..gridBottom) ||
+                        (event.x in rightButtonX..width.toFloat() && event.y in gridTop..gridBottom)) {
                         engine.onNextPieceButton(width, height)
                         invalidate()
                         return true
