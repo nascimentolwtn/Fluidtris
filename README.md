@@ -1,4 +1,4 @@
-# Fluidtris v3.0
+# Fluidtris v3.1
 
 A fluid, touch-driven Tetris-like game for Android where pieces can be freely dragged, rotated, and collide with each other before locking into place.
 

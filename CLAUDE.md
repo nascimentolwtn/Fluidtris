@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview - v3.0
+## Project Overview - v3.1
 
 Fluidtris is an Android Tetris-like game with a "fluid" physics twist: pieces can be freely dragged and rotated by touch before they lock into place. Features multi-piece simultaneous gameplay with physics-based collision, a progression system with level thresholds, and interactive controls. Built with Kotlin, targeting Android API 29+.
 

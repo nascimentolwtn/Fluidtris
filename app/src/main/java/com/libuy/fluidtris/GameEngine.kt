@@ -116,6 +116,15 @@ internal class GameEngine(
             }
 
             keepPieceInsideWalls(piece, viewWidth)
+
+            val gridBottomPx = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
+            if (rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)
+                    .any { (_, by) -> by > gridBottomPx }) {
+                if (draggedPiece === piece) draggedPiece = null
+                turnPieceRigidInternal(piece, viewWidth, viewHeight)
+                continue
+            }
+
             checkPieceCollisions(piece, pieceIsDragging, viewWidth, viewHeight)
 
             if (!pieceIsDragging && piece.isSnapAnimating &&
@@ -330,6 +339,7 @@ internal class GameEngine(
             for ((bx, by) in rotatedBlockCenters(shape, piece.x, piece.y, piece.rotation)) {
                 val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
                 val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
+                if (gy >= GameConstants.GRID_ROWS) { blocked = true; break }
                 if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS && grid[gy][gx] != null) {
                     blocked = true; break
                 }

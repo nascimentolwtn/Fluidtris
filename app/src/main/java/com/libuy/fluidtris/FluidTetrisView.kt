@@ -153,7 +153,7 @@ class FluidTetrisView @JvmOverloads constructor(
 
             if (buttonBottom > buttonTop) {
                 // Left button
-                paint.color = Color.argb(120, 80, 150, 100)
+                paint.color = Color.argb(80, 80, 150, 100)
                 canvas.drawRect(0f, buttonTop, GameConstants.GRID_LEFT, buttonBottom, paint)
                 paint.color = Color.argb(255, 255, 255, 255)
                 paint.textSize = 28f
@@ -164,7 +164,7 @@ class FluidTetrisView @JvmOverloads constructor(
 
                 // Right button
                 val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
-                paint.color = Color.argb(120, 80, 150, 100)
+                paint.color = Color.argb(80, 80, 150, 100)
                 canvas.drawRect(rightButtonX, buttonTop, width.toFloat(), buttonBottom, paint)
                 paint.color = Color.argb(255, 255, 255, 255)
                 canvas.save()

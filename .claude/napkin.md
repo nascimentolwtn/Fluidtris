@@ -5,7 +5,7 @@
 - Keep recurring, high-value notes only.
 - Max 10 items per category.
 - Each item includes date + "Do instead".
-- v3.0: Multi-piece physics fully operational. `ActivePiece` list with collision. Level progression and pause controls live.
+- v3.1: Multi-piece physics fully operational. Sanity-check force-locks pieces that escape below grid. `ActivePiece` list with collision. Level progression and pause controls live.
 
 ## Execution & Validation (Highest Priority)
 1. **[2026-06-02] Always build with gradlew on Windows**
