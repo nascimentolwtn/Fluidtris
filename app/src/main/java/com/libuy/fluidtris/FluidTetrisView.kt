@@ -144,25 +144,34 @@ class FluidTetrisView @JvmOverloads constructor(
             engine.nextPieceColor, 1f, previewBlockSize)
         canvas.restore()
 
-        // Next buttons (left and right, spanning grid height)
+        // Next buttons (left and right, between sound toggles and bottom buttons)
         if (!engine.isGameOver && !engine.isPaused) {
-            val gridTop = GameConstants.GRID_TOP
-            val gridBottom = height - GameConstants.GRID_BOTTOM_MARGIN
+            val buttonTopMargin = 400f  // below BG music toggle (280–380)
+            val buttonBottomMargin = height - 170f  // above bottom buttons (height-150 to height-50)
+            val buttonTop = buttonTopMargin
+            val buttonBottom = buttonBottomMargin
 
-            // Left button
-            val leftButtonX = 0f
-            paint.color = Color.argb(200, 80, 150, 100)
-            canvas.drawRect(leftButtonX, gridTop, GameConstants.GRID_LEFT, gridBottom, paint)
-            paint.color = Color.argb(255, 255, 255, 255)
-            paint.textSize = 32f
-            canvas.drawText("N", GameConstants.GRID_LEFT / 2 - 12f, gridTop + (gridBottom - gridTop) / 2 + 12f, paint)
+            if (buttonBottom > buttonTop) {
+                // Left button
+                paint.color = Color.argb(120, 80, 150, 100)
+                canvas.drawRect(0f, buttonTop, GameConstants.GRID_LEFT, buttonBottom, paint)
+                paint.color = Color.argb(255, 255, 255, 255)
+                paint.textSize = 28f
+                canvas.save()
+                canvas.rotate(90f, GameConstants.GRID_LEFT / 2, (buttonTop + buttonBottom) / 2)
+                canvas.drawText("next", GameConstants.GRID_LEFT / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
+                canvas.restore()
 
-            // Right button
-            val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
-            paint.color = Color.argb(200, 80, 150, 100)
-            canvas.drawRect(rightButtonX, gridTop, width.toFloat(), gridBottom, paint)
-            paint.color = Color.argb(255, 255, 255, 255)
-            canvas.drawText("N", rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2 - 12f, gridTop + (gridBottom - gridTop) / 2 + 12f, paint)
+                // Right button
+                val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
+                paint.color = Color.argb(120, 80, 150, 100)
+                canvas.drawRect(rightButtonX, buttonTop, width.toFloat(), buttonBottom, paint)
+                paint.color = Color.argb(255, 255, 255, 255)
+                canvas.save()
+                canvas.rotate(-90f, rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2, (buttonTop + buttonBottom) / 2)
+                canvas.drawText("next", rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
+                canvas.restore()
+            }
         }
 
         paint.color = Color.argb(180, 20, 60, 100)
@@ -380,12 +389,15 @@ class FluidTetrisView @JvmOverloads constructor(
                 }
                 // Next button touch detection (left and right side buttons)
                 if (!engine.isPaused && !engine.isGameOver) {
-                    val gridTop = GameConstants.GRID_TOP
-                    val gridBottom = height - GameConstants.GRID_BOTTOM_MARGIN
+                    val buttonTopMargin = 400f
+                    val buttonBottomMargin = height - 170f
+                    val buttonTop = buttonTopMargin
+                    val buttonBottom = buttonBottomMargin
                     val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
 
-                    if ((event.x in 0f..GameConstants.GRID_LEFT && event.y in gridTop..gridBottom) ||
-                        (event.x in rightButtonX..width.toFloat() && event.y in gridTop..gridBottom)) {
+                    if (buttonBottom > buttonTop &&
+                        ((event.x in 0f..GameConstants.GRID_LEFT && event.y in buttonTop..buttonBottom) ||
+                         (event.x in rightButtonX..width.toFloat() && event.y in buttonTop..buttonBottom))) {
                         engine.onNextPieceButton(width, height)
                         invalidate()
                         return true

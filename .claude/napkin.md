@@ -59,10 +59,8 @@
 4. **[2026-06-15] Feature: add ads**
    Do instead: integrate ad framework (Google Mobile Ads SDK). Show ads at three points: (a) mid-game banner/interstitial, (b) during pause menu, (c) during game-over screen. Define placement strategy and frequency.
 
-5. **[2026-06-18] Polish: replace next buttons with long side buttons**
-   Do instead: move "Next Piece" buttons from above/below the preview square to elongated buttons positioned along the left and right grid margins. Use `GRID_LEFT_MARGIN` and `GRID_RIGHT_MARGIN` spacing. Buttons span the full playable height for easy access during gameplay.
-
 ## Done
+- **[2026-06-18] Polish: side buttons respect UI layout** — Replaced square "Next" buttons (180x180) with elongated side buttons using grid margins. Left button spans `0..GRID_LEFT` (100f), right button spans `(width - GRID_RIGHT_MARGIN)..width`. Vertically positioned between sound toggles (after y: 400) and bottom buttons (before y: height-170), with proper margins. Vertical "next" text rotated 90°/-90° on each side. Touch detection updated for new bounds. Commit `eb7cc23`.
 - **[2026-06-17] Feature: background music + toggle button** — Added `SoundManager.startBgMusic()`, `pauseBgMusic()`, `resumeBgMusic()`, `stopBgMusic()`, `toggleBgMusic(context)` with `bgMusicEnabled` flag and looping `MediaPlayer`. `FluidTetrisView` renders 🎵/🎵🔇 button at y: 280–380 below SFX toggle; wired lifecycle: start on `init`, pause/resume on pause overlay toggle, restart on New Game, stop on Exit/detach. Audio file at `res/raw/bg_music.mp3`. All gameplay features unchanged.
 - **[2026-06-17] Refactor: add 8th column** — `GRID_COLUMNS=8`, `GRID_LEFT/RIGHT_MARGIN=100f`; 3 spawn points shifted `(vw/2)-50f` → `(vw/2)-100f`. Fixed `blockAtExactPieceCell_true` to pin I-piece (Z-piece was flaky at old test). 178 tests pass.
 - **[2026-06-17] Fix: fluid piece now locks on snap-animating peer** — `canPieceLockCleanly` gained `animatingPeerOccupiesCell(gx, gy+1, ...)` resting check (guarded by `ownCells` so a piece can't "rest on itself"). `livePieceContacts >= 1` branch splits: if `canPieceLockCleanly` returns true, starts lock timer (`isWaitingToTurnRigidAtPiece`) + snap animation; else bounces as before. New test `fluidPieceStartsLockTimerWhenRestingOnAnimatingPeer`. 179 tests pass.
