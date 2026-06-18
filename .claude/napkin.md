@@ -53,13 +53,14 @@
 2. **[2026-06-18] Polish: replace placeholder SFX files**
    Do instead: source and replace `game_over_sound.mp3` (sad end-game sound) and `high_score_cheer.mp3` (celebratory high-score sound) with actual CC0 audio files. Currently using `game_level_up.mp3` as placeholder.
 
-3. **[2026-06-15] Feature: slide while animating when no collision**
-   Do instead: during snap animation (lock countdown), allow piece to slide horizontally if there is no block/wall collision ahead. Currently snap animation is rigid; allow user input to push the piece left/right during the countdown if the target position remains open.
+3. **[2026-06-18] Feature: improve drag-while-snap UX**
+   Do instead: pick and implement one of three approaches (detailed in `.claude/plans/drag-while-snap-options.md`): clamp-not-bounce, ghost-drag, or ghost+resolve-on-release.
 
 4. **[2026-06-15] Feature: add ads**
    Do instead: integrate ad framework (Google Mobile Ads SDK). Show ads at three points: (a) mid-game banner/interstitial, (b) during pause menu, (c) during game-over screen. Define placement strategy and frequency.
 
 ## Done
+- **[2026-06-18] Feature: fluid snap release — any drag cancels snap animation** — dragging a snap-animating piece (center drag or rotation) immediately cancels snap state and returns piece to fluid. Center drag into open space slides freely; center drag into a solid block reverts position, sets bounce spring (`springForceX = -dx * SPRING_CARRY`), and releases drag. Rotation gesture cancels snap and applies rotation torque inline. Normal drag collision also sets bounce spring. Fix: `turnPieceRigidInternal` grid write guarded by `grid[gy][gx] == null` to prevent overwrites on full-stack force-lock.
 - **[2026-06-18] Polish: side buttons respect UI layout** — Replaced square "Next" buttons (180x180) with elongated side buttons using grid margins. Left button spans `0..GRID_LEFT` (100f), right button spans `(width - GRID_RIGHT_MARGIN)..width`. Vertically positioned between sound toggles (after y: 400) and bottom buttons (before y: height-170), with proper margins. Vertical "next" text rotated 90°/-90° on each side. Touch detection updated for new bounds. Commit `eb7cc23`.
 - **[2026-06-17] Feature: background music + toggle button** — Added `SoundManager.startBgMusic()`, `pauseBgMusic()`, `resumeBgMusic()`, `stopBgMusic()`, `toggleBgMusic(context)` with `bgMusicEnabled` flag and looping `MediaPlayer`. `FluidTetrisView` renders 🎵/🎵🔇 button at y: 280–380 below SFX toggle; wired lifecycle: start on `init`, pause/resume on pause overlay toggle, restart on New Game, stop on Exit/detach. Audio file at `res/raw/bg_music.mp3`. All gameplay features unchanged.
 - **[2026-06-17] Refactor: add 8th column** — `GRID_COLUMNS=8`, `GRID_LEFT/RIGHT_MARGIN=100f`; 3 spawn points shifted `(vw/2)-50f` → `(vw/2)-100f`. Fixed `blockAtExactPieceCell_true` to pin I-piece (Z-piece was flaky at old test). 178 tests pass.

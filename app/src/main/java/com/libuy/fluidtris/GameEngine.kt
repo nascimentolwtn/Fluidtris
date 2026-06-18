@@ -119,8 +119,14 @@ internal class GameEngine(
 
             val gridBottomPx = viewHeight - GameConstants.GRID_BOTTOM_MARGIN
             if (rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)
-                    .any { (_, by) -> by > gridBottomPx }) {
+                    .any { (_, by) -> by >= gridBottomPx }) {
                 if (draggedPiece === piece) draggedPiece = null
+                // Pre-clamp: push piece up until all block centers are within grid bounds
+                while (rotatedBlockCenters(GameConstants.PIECES[piece.type], piece.x, piece.y, piece.rotation)
+                           .any { (_, by) -> by >= gridBottomPx }) {
+                    piece.y -= 5f
+                    if (piece.y < GameConstants.GRID_TOP) break
+                }
                 turnPieceRigidInternal(piece, viewWidth, viewHeight)
                 continue
             }
@@ -209,6 +215,46 @@ internal class GameEngine(
         val piece = draggedPiece ?: return
         val dx = x - lastTouchX
         val dy = y - lastTouchY
+
+        // Any drag gesture releases the piece from snap animation back to fluid state.
+        // The snap re-engages fresh on the next frame if the piece is still at the landing position.
+        if (piece.isSnapAnimating) {
+            piece.isSnapAnimating = false
+            piece.isWaitingToTurnRigidAtBottom = false
+            piece.isWaitingToTurnRigidAtPiece = false
+            piece.bounceCount = 0
+            lastTouchX = x
+            lastTouchY = y
+            val cw = (viewWidth - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
+            val ch = (viewHeight - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
+            if (isDraggingCenter) {
+                val prevX = piece.x
+                piece.x += dx
+                keepPieceInsideWalls(piece, viewWidth)
+                if (checkPieceCollidingWithGrid(piece, cw, ch)) {
+                    piece.x = prevX
+                    piece.springForceX = -dx * GameConstants.SPRING_CARRY  // bounce away from block
+                    draggedPiece = null
+                }
+            } else {
+                // Rotation gesture: compute and apply delta inline (same formula as normal drag path)
+                val shape = GameConstants.PIECES[piece.type]
+                val rcx = piece.x + shape[0].size * GameConstants.PIECE_SIZE / 2f
+                val rcy = piece.y + shape.size * GameConstants.PIECE_SIZE / 2f
+                val angle = piece.rotation * Math.PI / 180.0
+                val cosA = cos(angle)
+                val sinA = sin(angle)
+                val bux = piece.x + (touchedBlockCol + 0.5f) * GameConstants.PIECE_SIZE
+                val buy = piece.y + (touchedBlockRow + 0.5f) * GameConstants.PIECE_SIZE
+                val bdx = (bux - rcx).toDouble()
+                val bdy = (buy - rcy).toDouble()
+                val bxRot = (rcx + bdx * cosA - bdy * sinA).toFloat()
+                val byRot = (rcy + bdx * sinA + bdy * cosA).toFloat()
+                piece.rotation -= rotationDeltaFromDrag(rcx - bxRot, rcy - byRot, dx, dy, GameConstants.ROTATION_SENSITIVITY)
+            }
+            return  // early-return avoids checkPieceAtBottom locking the piece at the bottom
+        }
+
         piece.springForceX = dx * GameConstants.SPRING_CARRY
         var appliedDx = 0f
         var appliedDy = 0f
@@ -260,6 +306,7 @@ internal class GameEngine(
                 piece.x -= appliedDx
                 piece.y -= appliedDy
                 piece.rotation = prevRotation
+                if (appliedDx != 0f) piece.springForceX = -appliedDx * GameConstants.SPRING_CARRY
                 draggedPiece = null
             }
         }
@@ -339,7 +386,6 @@ internal class GameEngine(
             for ((bx, by) in rotatedBlockCenters(shape, piece.x, piece.y, piece.rotation)) {
                 val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
                 val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
-                if (gy >= GameConstants.GRID_ROWS) { blocked = true; break }
                 if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS && grid[gy][gx] != null) {
                     blocked = true; break
                 }
@@ -352,7 +398,7 @@ internal class GameEngine(
         for ((bx, by) in rotatedBlockCenters(shape, piece.x, piece.y, piece.rotation)) {
             val gx = ((bx - GameConstants.GRID_LEFT) / cellWidth).toInt()
             val gy = ((by - GameConstants.GRID_TOP) / cellHeight).toInt()
-            if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS) {
+            if (gx in 0 until GameConstants.GRID_COLUMNS && gy in 0 until GameConstants.GRID_ROWS && grid[gy][gx] == null) {
                 grid[gy][gx] = piece.color
             }
         }
