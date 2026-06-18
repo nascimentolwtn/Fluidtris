@@ -42,7 +42,15 @@ class FluidTetrisView @JvmOverloads constructor(
         onPieceLocked = { soundManager.playRigid() },
         onLineCleared = { soundManager.playMove() },
         onHighScoreBeat = { newScore -> highScoreManager.saveHighScore(newScore) },
-        onLevelUp = { soundManager.playLevelUpSound() }
+        onLevelUp = { soundManager.playLevelUpSound() },
+        onGameOver = { beatHighScore ->
+            soundManager.pauseBgMusic()
+            if (beatHighScore) {
+                soundManager.playHighScoreCheer()
+            } else {
+                soundManager.playGameOverSound()
+            }
+        }
     )
     private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {

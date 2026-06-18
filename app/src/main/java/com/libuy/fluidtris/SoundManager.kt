@@ -24,6 +24,14 @@ internal class SoundManager(private val context: Context) {
         if (enabled) queueSound(R.raw.game_level_up)
     }
 
+    fun playGameOverSound() {
+        if (enabled) queueSound(R.raw.game_over_sound)
+    }
+
+    fun playHighScoreCheer() {
+        if (enabled) queueSound(R.raw.high_score_cheer)
+    }
+
     private fun queueSound(resId: Int) {
         soundQueue.add(resId)
         if (currentMediaPlayer == null) playNextInQueue()

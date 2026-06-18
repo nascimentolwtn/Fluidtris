@@ -28,7 +28,8 @@ internal class GameEngine(
     private val onPieceLocked: () -> Unit,
     private val onLineCleared: () -> Unit,
     private val onHighScoreBeat: (newScore: Int) -> Unit = {},
-    private val onLevelUp: () -> Unit = {}
+    private val onLevelUp: () -> Unit = {},
+    private val onGameOver: (beatHighScore: Boolean) -> Unit = {}
 ) {
     val grid = Array(GameConstants.GRID_ROWS) { Array<Int?>(GameConstants.GRID_COLUMNS) { null } }
     var score = 0
@@ -366,6 +367,7 @@ internal class GameEngine(
 
         if (grid[0].any { it != null }) {
             isGameOver = true
+            onGameOver(justBeatHighScore)
         }
     }
 

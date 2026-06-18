@@ -6,9 +6,9 @@ Fluidtris has three SFX (line clear, piece lock, level-up) but no ambient backgr
 ## Prerequisite: Audio File
 An audio file must be placed at:
 ```
-app/src/main/res/raw/bg_music.ogg
+app/src/main/res/raw/bg_music.mp3
 ```
-The code references `R.raw.bg_music`. Implementation includes sourcing a CC0-licensed looping ambient/chiptune track via WebSearch, then downloading it with curl to the correct path. Preference: something relaxed and loopable that fits a puzzle game — 1–3 min loop, OGG or MP3, ≤2 MB.
+The code references `R.raw.bg_music`. MediaPlayer supports both OGG and MP3 formats; the resource ID resolves based on filename in `res/raw/`. Place your audio file in the directory above.
 
 ---
 
