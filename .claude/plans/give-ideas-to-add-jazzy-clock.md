@@ -42,7 +42,11 @@ var diamonds: Int = 0
 
 Bar-fill events (increment in existing methods):
 - `turnPieceRigidInternal()` → `+10f` per piece locked
-- `onLineCleared` path inside `checkLines()` → `+25f` per line cleared
+- `onLineCleared` path inside `checkLines()` → scale by line count:
+  - 1 line: `+25f`
+  - 2 lines: `+50f` (2x multiplier)
+  - 3 lines: `+100f` (4x multiplier)
+  - 4 lines (Tetris): `+200f` (8x multiplier)
 - `onNextPieceButton()` (player taps side "next" button) → `+5f`
 
 When `specialBarProgress >= 100f`:
@@ -93,18 +97,51 @@ Add `streakMultiplier: Int = 1` and `lastLineClearTimeMs: Long` to `GameEngine`.
 ### 3b. Daily Challenge Mode
 Seed `Random` from `LocalDate.now().toEpochDay()` for the piece sequence. All players get identical pieces that day. Show a daily-mode banner in the score HUD. Separate leaderboard (score only, no persistence needed locally — future server).
 
-### 3c. Achievement Toasts
-Add `AchievementManager` (pure Kotlin, no Android imports). Events dispatched from `GameEngine` callbacks → check milestone conditions → fire `onAchievementUnlocked(title, icon)` callback → `FluidTetrisView` draws a 2-second toast overlay (slide-in rect with title text). Sample milestones: first bomb detonation, 5 diamonds earned, level 10 reached, 4-line Tetris clear.
+### 3c. Achievement Toasts + Character Themes
+Add `AchievementManager` (pure Kotlin, no Android imports). Events dispatched from `GameEngine` callbacks → check milestone conditions → fire `onAchievementUnlocked(title, icon)` callback → `FluidTetrisView` draws a 2-second toast overlay (slide-in rect with title text).
+
+**Character-themed milestones** (tie to Brawl Stars splash characters):
+- **Kit** (hacker vibe): "Slick Reroller" — use reroll 10 times in one run
+- **Elmo** (fiery): "Inferno Streak" — clear 4 lines consecutively within 10 seconds
+- **Slime** (gooey): "Slime Slayer" — activate slime bomb perk 5 times
+- **Crow** (assassin): "Precision Strike" — detonate bomb with exact radius (no wasted cells)
+- **Bea** (bee theme): "Honeycomb" — lock 50 pieces total
+- **Gene** (magic): "Mystic Diamonds" — earn 25 diamonds in a single run
+
+These unlock cosmetic variants of bomb/piece visuals tied to character themes.
 
 ### 3d. IAP Perk Framework (stub now, fill later)
 Create `PerkManager.kt` with:
 ```kotlin
 object PerkManager {
     fun isPerkUnlocked(perk: Perk): Boolean = false  // always false until IAP live
-    enum class Perk { SLOW_MODE, BOMB_PACK, EXTRA_DIAMONDS, UNDO_LOCK }
+    enum class Perk { 
+        SLOW_MODE, 
+        BOMB_PACK, 
+        EXTRA_DIAMONDS, 
+        UNDO_LOCK,
+        SMALL_PIECES_2BLOCK,  // Spawn 2-block horizontal pieces
+        SMALL_PIECES_1BLOCK,  // Spawn 1-block square pieces (fills gaps)
+        SLIME_BOMB            // Clears entire line on lock (contact-point line clear)
+    }
 }
 ```
 In the pause overlay, add a grayed-out "Perks [soon]" button. When `PerkManager` goes live, swap the stub. Google Play Billing Library 6.x integrates here. This keeps `GameEngine` clean — no IAP logic bleeds in.
+
+**Small piece perks**: When active, the next-piece pool includes compact pieces (2-block or 1-block variants) that can slip into tight gaps. Balances skill reward with convenience. Higher engagement loop: players unlock perks → use them in runs → rack up more diamonds → unlock more perks.
+
+**Slime bomb perk**: When active, pieces on lock trigger a "slime" effect that clears the entire horizontal line where the piece's bottom-most block landed. Differs from bomb radius—it's surgical line-clear based on contact point, creating a feedback loop: slime triggers line clear → special bar fills faster → cycle accelerates.
+
+### 3e. Character Cosmetics & Skins
+Brawl Stars characters unlock cosmetic variants for bombs and pieces:
+
+- **Kit skin**: 🤖 Robot/tech bomb with digital explosion animation, reroll button styled as a hacker glitch effect
+- **Elmo skin**: 🔥 Fiery bomb with flame-burst particles, pieces glow red/orange
+- **Slime skin**: 💚 Slime bomb drips on detonation, pieces render as gooey blobs, slime perk shows ooze effect
+- **Crow skin**: 🎩 Sleek bomb with purple/dark aura, pieces have a shadow/assassin aesthetic
+- **Bea skin**: 🐝 Bee-themed bomb with yellow/gold sparkles, honeycomb grid background pattern
+
+Each character skin is purely cosmetic—same mechanics, different visual theme. Unlocked via achievements or future IAP. Renders by storing `selectedSkin: String` in `HighScoreManager` and swapping colors/animations in bomb/piece drawing code.
 
 ---
 
@@ -112,11 +149,12 @@ In the pause overlay, add a grayed-out "Perks [soon]" button. When `PerkManager`
 
 | File | Change |
 |---|---|
-| `GameConstants.kt` | Bomb constants, `STREAK_WINDOW_MS` |
+| `GameConstants.kt` | Bomb constants, `STREAK_WINDOW_MS`, character skin color palettes |
 | `GameEngine.kt` | `ActivePiece.specialType`, `specialBarProgress`, `diamonds`, `explodeBomb()`, `spendDiamond()`, bar-fill increments |
-| `FluidTetrisView.kt` | Draw bar + diamond counter, reroll/clear-row buttons, bomb emoji overlay, shake animation |
-| `HighScoreManager.kt` | `saveDiamonds` / `loadDiamonds` |
+| `FluidTetrisView.kt` | Draw bar + diamond counter, reroll/clear-row buttons, bomb emoji overlay, shake animation, character-themed visuals |
+| `HighScoreManager.kt` | `saveDiamonds` / `loadDiamonds`, `selectedSkin` persistence |
 | `PerkManager.kt` (new) | Stub only |
+| `AchievementManager.kt` (new) | Character-themed milestone tracking, skin unlock logic |
 
 ---
 
@@ -126,8 +164,9 @@ In the pause overlay, add a grayed-out "Perks [soon]" button. When `PerkManager`
 3. **Reroll button** — first diamond spend, validates the economy loop
 4. **Clear-bottom-row button** — second spend option
 5. **Streak multiplier** — pure engine, no UI beyond a text label
-6. **Achievement toasts** — polish layer
-7. **IAP stub** — structural only, no real integration yet
+6. **Achievement toasts** — polish layer, includes character-themed milestones
+7. **Character cosmetics & skins** — unlock Kit, Elmo, Slime, Crow, Bea themes via achievements
+8. **IAP stub** — structural only, no real integration yet
 
 ---
 

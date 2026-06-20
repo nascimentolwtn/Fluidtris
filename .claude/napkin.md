@@ -47,31 +47,21 @@
    Do instead: when adjusting touch input, check which half of the piece bounding box the touch originates from before applying rotation direction.
 
 ## Backlog
-1. **[2026-06-19] Feature: gamification specials — bombs, diamonds, perks**
-   Do instead: implement bomb pieces (8% spawn → explode on lock), special bar → diamonds (award on lock/line-clear), reroll/clear-row buttons, future streak multiplier + daily challenges + achievements + IAP stub. See plan at `.claude/plans/give-ideas-to-add-jazzy-clock.md`.
-
-2. **[2026-06-19] Balance: raise level-up threshold from 300**
-   Do instead: increase `NEXT_LEVEL_SCORE` to slow progression (e.g., 400–500 points per level). Current 300-point threshold causes frequent leveling; higher threshold extends mid-game and increases perceived difficulty without changing base mechanics.
-
+1. **[2026-06-18] Polish: replace placeholder SFX files**
+   Do instead: source and replace `game_over_sound.mp3` (sad end-game sound) and `high_score_cheer.mp3` (celebratory high-score sound) with actual CC0 audio files. Currently using `game_level_up.mp3` as placeholder.
+2. **[2026-06-19] Feature: scale lock animation time by level**
+   Do instead: decrease `LOCK_DELAY_MS` / snap pull duration as level increases. Higher levels = faster snap-to-grid animation (shorter countdown before piece becomes rigid).
 3. **[2026-06-19] Feature: scale line-clear points by level**
    Do instead: multiply line-clear scoring by level multiplier. e.g., 1 line at level 1 = 100pts, at level 2 = 100 * 1.3 = 130pts, etc.
-
-4. **[2026-06-19] Feature: scale lock animation time by level**
-   Do instead: decrease `LOCK_DELAY_MS` / snap pull duration as level increases. Higher levels = faster snap-to-grid animation (shorter countdown before piece becomes rigid).
-
+4. **[2026-06-19] Balance: raise level-up threshold from 300**
+   Do instead: increase `NEXT_LEVEL_SCORE` to slow progression (e.g., 400–500 points per level). Current 300-point threshold causes frequent leveling; higher threshold extends mid-game and increases perceived difficulty without changing base mechanics.
 5. **[2026-06-17] Feature: config screen unifies in-game controls**
    Do instead: replace all scattered buttons (sound/music toggle, next-piece left/right, new-game, exit) with single config button. Config button at sound-toggle position opens overlay with 6 options (2×3 grid). Only pause button remains on play area. Disable config during pause/game-over (only New Game + Exit active at game-over). See plan at `.claude/plans/new-feature-config-screen-unified-controls.md`.
-
 6. **[2026-06-19] Feature: splash screen → game mode select**
    Do instead: after init splash, show a "Select Game" page with two modes: (1) **Collision mode** — regular game with clamp-not-bounce drag-while-snap (Option 1 of `.claude/plans/drag-while-snap-options.md`); (2) **Free fluid mode** — ghost drag, piece follows finger exactly with no collision checks during drag (Option 2 of same plan), plus mode-specific settings. Modes are mutually exclusive; selection persists.
-
-7. **[2026-06-18] Feature: improve drag-while-snap UX**
-   Do instead: pick and implement one of three approaches (detailed in `.claude/plans/drag-while-snap-options.md`): clamp-not-bounce, ghost-drag, or ghost+resolve-on-release.
-
-8. **[2026-06-18] Polish: replace placeholder SFX files**
-   Do instead: source and replace `game_over_sound.mp3` (sad end-game sound) and `high_score_cheer.mp3` (celebratory high-score sound) with actual CC0 audio files. Currently using `game_level_up.mp3` as placeholder.
-
-9. **[2026-06-15] Feature: add ads**
+7. **[2026-06-19] Feature: gamification specials — bombs, diamonds, perks**
+   Do instead: implement bomb pieces (8% spawn → explode on lock), special bar → diamonds (award on lock/line-clear), reroll/clear-row buttons, future streak multiplier + daily challenges + achievements + IAP stub. See plan at `.claude/plans/give-ideas-to-add-jazzy-clock.md`.
+8. **[2026-06-15] Feature: add ads**
    Do instead: integrate ad framework (Google Mobile Ads SDK). Show ads at three points: (a) mid-game banner/interstitial, (b) during pause menu, (c) during game-over screen. Define placement strategy and frequency.
 
 ## Done
