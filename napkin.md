@@ -1,4 +1,4 @@
-# Backlog
+# Napkin
 
 Informal notes on ideas not yet scheduled for implementation.
 
