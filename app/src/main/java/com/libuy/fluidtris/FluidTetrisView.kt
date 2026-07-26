@@ -154,59 +154,13 @@ class FluidTetrisView @JvmOverloads constructor(
 
         // Next buttons (left and right, between sound toggles and bottom buttons)
         if (!engine.isGameOver && !engine.isPaused && !engine.isMazeActive) {
-            val buttonTop = GameConstants.SIDE_BUTTON_TOP
-            val buttonBottom = height - GameConstants.SIDE_BUTTON_BOTTOM_MARGIN
-
-            if (buttonBottom > buttonTop) {
-                // Left button
-                paint.color = Color.argb(80, 80, 150, 100)
-                canvas.drawRect(0f, buttonTop, GameConstants.GRID_LEFT, buttonBottom, paint)
-                paint.color = Color.argb(255, 255, 255, 255)
-                paint.textSize = 28f
-                canvas.save()
-                canvas.rotate(90f, GameConstants.GRID_LEFT / 2, (buttonTop + buttonBottom) / 2)
-                canvas.drawText("next", GameConstants.GRID_LEFT / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
-                canvas.restore()
-
-                // Right button
-                val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
-                paint.color = Color.argb(80, 80, 150, 100)
-                canvas.drawRect(rightButtonX, buttonTop, width.toFloat(), buttonBottom, paint)
-                paint.color = Color.argb(255, 255, 255, 255)
-                canvas.save()
-                canvas.rotate(-90f, rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2, (buttonTop + buttonBottom) / 2)
-                canvas.drawText("next", rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
-                canvas.restore()
-            }
+            drawSideButtons(canvas, "next", 80, 150, 100)
         }
 
         // Route-hint buttons (left and right), maze mode only, once the reveal finishes
         if (engine.isMazeActive && engine.isMazeRevealComplete()) {
-            val buttonTop = GameConstants.SIDE_BUTTON_TOP
-            val buttonBottom = height - GameConstants.SIDE_BUTTON_BOTTOM_MARGIN
             val label = if (engine.isMazeRouteVisible) "hide" else "route"
-
-            if (buttonBottom > buttonTop) {
-                // Left button
-                paint.color = Color.argb(80, 150, 120, 80)
-                canvas.drawRect(0f, buttonTop, GameConstants.GRID_LEFT, buttonBottom, paint)
-                paint.color = Color.argb(255, 255, 255, 255)
-                paint.textSize = 28f
-                canvas.save()
-                canvas.rotate(90f, GameConstants.GRID_LEFT / 2, (buttonTop + buttonBottom) / 2)
-                canvas.drawText(label, GameConstants.GRID_LEFT / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
-                canvas.restore()
-
-                // Right button
-                val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
-                paint.color = Color.argb(80, 150, 120, 80)
-                canvas.drawRect(rightButtonX, buttonTop, width.toFloat(), buttonBottom, paint)
-                paint.color = Color.argb(255, 255, 255, 255)
-                canvas.save()
-                canvas.rotate(-90f, rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2, (buttonTop + buttonBottom) / 2)
-                canvas.drawText(label, rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
-                canvas.restore()
-            }
+            drawSideButtons(canvas, label, 150, 120, 80)
         }
 
         paint.color = Color.argb(180, 20, 60, 100)
@@ -344,6 +298,14 @@ class FluidTetrisView @JvmOverloads constructor(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                // Keep the maze swipe-gesture anchor current on every touch-down, even when a
+                // button elsewhere in this block consumes the event — otherwise a drag that
+                // starts on a button and continues into the grid without lifting would compute
+                // its first delta against a stale reference point from a previous gesture.
+                if (engine.isMazeActive) {
+                    mazeTouchRefX = event.x
+                    mazeTouchRefY = event.y
+                }
                 if (event.x in 10f..280f && event.y in 170f..270f) {
                     soundManager.enabled = !soundManager.enabled
                     invalidate()
@@ -425,37 +387,22 @@ class FluidTetrisView @JvmOverloads constructor(
                     return true
                 }
                 // Next button touch detection (left and right side buttons)
-                if (!engine.isPaused && !engine.isGameOver && !engine.isMazeActive) {
-                    val buttonTop = GameConstants.SIDE_BUTTON_TOP
-                    val buttonBottom = height - GameConstants.SIDE_BUTTON_BOTTOM_MARGIN
-                    val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
-
-                    if (buttonBottom > buttonTop &&
-                        ((event.x in 0f..GameConstants.GRID_LEFT && event.y in buttonTop..buttonBottom) ||
-                         (event.x in rightButtonX..width.toFloat() && event.y in buttonTop..buttonBottom))) {
-                        engine.onNextPieceButton(width, height)
-                        invalidate()
-                        return true
-                    }
+                if (!engine.isPaused && !engine.isGameOver && !engine.isMazeActive &&
+                    isSideButtonTouch(event.x, event.y)) {
+                    engine.onNextPieceButton(width, height)
+                    invalidate()
+                    return true
                 }
                 // Route-hint button touch detection (left and right side buttons), maze mode only
-                if (!engine.isPaused && engine.isMazeActive && engine.isMazeRevealComplete()) {
-                    val buttonTop = GameConstants.SIDE_BUTTON_TOP
-                    val buttonBottom = height - GameConstants.SIDE_BUTTON_BOTTOM_MARGIN
-                    val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
-
-                    if (buttonBottom > buttonTop &&
-                        ((event.x in 0f..GameConstants.GRID_LEFT && event.y in buttonTop..buttonBottom) ||
-                         (event.x in rightButtonX..width.toFloat() && event.y in buttonTop..buttonBottom))) {
-                        engine.toggleMazeRoute()
-                        invalidate()
-                        return true
-                    }
+                if (!engine.isPaused && engine.isMazeActive && engine.isMazeRevealComplete() &&
+                    isSideButtonTouch(event.x, event.y)) {
+                    engine.toggleMazeRoute()
+                    invalidate()
+                    return true
                 }
-                // Fallback: any remaining touch-down while solving a maze starts a swipe gesture.
+                // Fallback: any remaining touch-down while solving a maze starts a swipe gesture
+                // (the anchor was already refreshed above).
                 if (!engine.isPaused && engine.isMazeActive) {
-                    mazeTouchRefX = event.x
-                    mazeTouchRefY = event.y
                     return true
                 }
             }
@@ -498,6 +445,41 @@ class FluidTetrisView @JvmOverloads constructor(
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         soundManager.stopBgMusic()
+    }
+
+    // Shared layout for the elongated left/right strips used by both the "next piece" button
+    // and the maze-mode "route" button — only one of the two is ever shown at a time.
+    private fun drawSideButtons(canvas: Canvas, label: String, r: Int, g: Int, b: Int) {
+        val buttonTop = GameConstants.SIDE_BUTTON_TOP
+        val buttonBottom = height - GameConstants.SIDE_BUTTON_BOTTOM_MARGIN
+        if (buttonBottom <= buttonTop) return
+
+        paint.color = Color.argb(80, r, g, b)
+        canvas.drawRect(0f, buttonTop, GameConstants.GRID_LEFT, buttonBottom, paint)
+        paint.color = Color.argb(255, 255, 255, 255)
+        paint.textSize = 28f
+        canvas.save()
+        canvas.rotate(90f, GameConstants.GRID_LEFT / 2, (buttonTop + buttonBottom) / 2)
+        canvas.drawText(label, GameConstants.GRID_LEFT / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
+        canvas.restore()
+
+        val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
+        paint.color = Color.argb(80, r, g, b)
+        canvas.drawRect(rightButtonX, buttonTop, width.toFloat(), buttonBottom, paint)
+        paint.color = Color.argb(255, 255, 255, 255)
+        canvas.save()
+        canvas.rotate(-90f, rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2, (buttonTop + buttonBottom) / 2)
+        canvas.drawText(label, rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
+        canvas.restore()
+    }
+
+    private fun isSideButtonTouch(x: Float, y: Float): Boolean {
+        val buttonTop = GameConstants.SIDE_BUTTON_TOP
+        val buttonBottom = height - GameConstants.SIDE_BUTTON_BOTTOM_MARGIN
+        if (buttonBottom <= buttonTop) return false
+        val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
+        return (x in 0f..GameConstants.GRID_LEFT && y in buttonTop..buttonBottom) ||
+            (x in rightButtonX..width.toFloat() && y in buttonTop..buttonBottom)
     }
 
     // Drags of at least half a cell move the player one step; the reference point then resets
