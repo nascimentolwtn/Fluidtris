@@ -160,8 +160,10 @@ class GameEngineMazeTest {
         clearOneLine(e) { fakeTimeMs += 16L }
         assertTrue(e.isMazeActive)
 
-        // Independently regenerate the same maze (same seed) to compute the solving path.
-        val expectedMaze = MazeGenerator.generate(GameConstants.GRID_COLUMNS, GameConstants.GRID_ROWS, Random(seed))
+        // Independently regenerate the same maze (same seed + braid setting) to compute the solving path.
+        val expectedMaze = MazeGenerator.generate(
+            GameConstants.GRID_COLUMNS, GameConstants.GRID_ROWS, Random(seed), GameConstants.MAZE_BRAID_PERCENT
+        )
         val path = solutionPath(expectedMaze.grid, GameConstants.GRID_ROWS, GameConstants.GRID_COLUMNS)
         assertTrue(path.isNotEmpty())
 
@@ -177,5 +179,129 @@ class GameEngineMazeTest {
         assertFalse("Maze should end once the exit is reached", e.isMazeActive)
         assertEquals(1, mazeSolvedCount)
         assertEquals("Fluidtris should resume with a freshly spawned piece", 1, e.fallingPieces.size)
+    }
+
+    // Drives the engine to an active, fully-revealed maze at level 5 with a fixed seed.
+    private fun mazeAtLevel5(e: GameEngine, advanceTime: (Long) -> Unit, seed: Int) {
+        e.mazeRandom = Random(seed)
+        e.score = GameConstants.NEXT_LEVEL_SCORE * 4 - 100
+        clearOneLine(e) { advanceTime(16L) }
+        advanceTime(GameConstants.MAZE_REVEAL_DURATION_MS + 100L)
+    }
+
+    @Test
+    fun toggleMazeRoute_beforeRevealComplete_isNoOp() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+        e.mazeRandom = Random(5)
+        e.score = GameConstants.NEXT_LEVEL_SCORE * 4 - 100
+        clearOneLine(e) { fakeTimeMs += 16L }
+        assertTrue(e.isMazeActive)
+
+        // Reveal animation just started; the route toggle must be a no-op.
+        e.toggleMazeRoute()
+        assertFalse(e.isMazeRouteVisible)
+        assertTrue(e.mazeRouteCells().isEmpty())
+    }
+
+    @Test
+    fun showRoute_startsAtPlayerCell_endsAtExit() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+        mazeAtLevel5(e, { fakeTimeMs += it }, seed = 13)
+
+        e.toggleMazeRoute()
+
+        assertTrue(e.isMazeRouteVisible)
+        val route = e.mazeRouteCells()
+        assertTrue(route.isNotEmpty())
+        assertEquals(0 to 0, route.first())
+        assertEquals(e.mazeExitRow to e.mazeExitCol, route.last())
+    }
+
+    @Test
+    fun toggleMazeRoute_calledAgain_hidesRoute() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+        mazeAtLevel5(e, { fakeTimeMs += it }, seed = 21)
+
+        e.toggleMazeRoute()
+        assertTrue(e.isMazeRouteVisible)
+        e.toggleMazeRoute()
+
+        assertFalse(e.isMazeRouteVisible)
+        assertTrue(e.mazeRouteCells().isEmpty())
+    }
+
+    @Test
+    fun movingWhileRouteVisible_recalculatesFromNewPosition() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+        mazeAtLevel5(e, { fakeTimeMs += it }, seed = 34)
+
+        e.toggleMazeRoute()
+        assertTrue(e.isMazeRouteVisible)
+
+        // Start cell always has at least one open direction toward south or east.
+        val startCell = e.mazeCellAt(0, 0)!!
+        val direction = if (!startCell.south) MazeDirection.DOWN else MazeDirection.RIGHT
+        val moved = e.attemptMazeMove(direction, VW, VH)
+        assertTrue("Start cell must have an open south or east wall", moved)
+
+        assertTrue("Route must stay visible after a non-winning move", e.isMazeRouteVisible)
+        val recalculated = e.mazeRouteCells()
+        assertTrue(recalculated.isNotEmpty())
+        assertEquals("Recalculated route must start at the player's new cell",
+            e.mazePlayerRow to e.mazePlayerCol, recalculated.first())
+        assertEquals(e.mazeExitRow to e.mazeExitCol, recalculated.last())
+    }
+
+    @Test
+    fun solvingMazeWithRouteVisible_clearsRouteStateOnCompletion() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+
+        val seed = 2024
+        mazeAtLevel5(e, { fakeTimeMs += it }, seed = seed)
+        e.toggleMazeRoute()
+        assertTrue(e.isMazeRouteVisible)
+
+        val expectedMaze = MazeGenerator.generate(
+            GameConstants.GRID_COLUMNS, GameConstants.GRID_ROWS, Random(seed), GameConstants.MAZE_BRAID_PERCENT
+        )
+        val path = solutionPath(expectedMaze.grid, GameConstants.GRID_ROWS, GameConstants.GRID_COLUMNS)
+        for (direction in path) {
+            assertTrue(e.attemptMazeMove(direction, VW, VH))
+        }
+
+        assertFalse(e.isMazeActive)
+        assertFalse("Route hint must clear once the maze is solved", e.isMazeRouteVisible)
+        assertTrue(e.mazeRouteCells().isEmpty())
+    }
+
+    @Test
+    fun resetGame_clearsMazeRouteState() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+        mazeAtLevel5(e, { fakeTimeMs += it }, seed = 7)
+        e.toggleMazeRoute()
+        assertTrue(e.isMazeRouteVisible)
+
+        e.resetGame(VW, VH)
+
+        assertFalse(e.isMazeRouteVisible)
+        assertTrue(e.mazeRouteCells().isEmpty())
     }
 }

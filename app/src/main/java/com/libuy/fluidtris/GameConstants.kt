@@ -27,6 +27,10 @@ internal object GameConstants {
     // before Fluidtris resumes. 0 disables the feature entirely.
     const val MAZE_LEVEL_INTERVAL = 5
     const val MAZE_REVEAL_DURATION_MS = 2000L
+    const val MAZE_BRAID_PERCENT = 0.35f // fraction of dead ends opened into loops (0 = perfect maze)
+    const val MAZE_ROUTE_DOT_RADIUS_FRACTION = 0.14f // route-hint dot radius as fraction of min cell dimension
+    const val SIDE_BUTTON_TOP = 400f          // below BG music toggle (280–380)
+    const val SIDE_BUTTON_BOTTOM_MARGIN = 170f // above bottom buttons (height-150 to height-50)
 
     val PIECES: List<List<List<Int>>> = listOf(
         listOf(listOf(1, 1, 1, 1)),              // I

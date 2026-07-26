@@ -154,10 +154,8 @@ class FluidTetrisView @JvmOverloads constructor(
 
         // Next buttons (left and right, between sound toggles and bottom buttons)
         if (!engine.isGameOver && !engine.isPaused && !engine.isMazeActive) {
-            val buttonTopMargin = 400f  // below BG music toggle (280–380)
-            val buttonBottomMargin = height - 170f  // above bottom buttons (height-150 to height-50)
-            val buttonTop = buttonTopMargin
-            val buttonBottom = buttonBottomMargin
+            val buttonTop = GameConstants.SIDE_BUTTON_TOP
+            val buttonBottom = height - GameConstants.SIDE_BUTTON_BOTTOM_MARGIN
 
             if (buttonBottom > buttonTop) {
                 // Left button
@@ -178,6 +176,35 @@ class FluidTetrisView @JvmOverloads constructor(
                 canvas.save()
                 canvas.rotate(-90f, rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2, (buttonTop + buttonBottom) / 2)
                 canvas.drawText("next", rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
+                canvas.restore()
+            }
+        }
+
+        // Route-hint buttons (left and right), maze mode only, once the reveal finishes
+        if (engine.isMazeActive && engine.isMazeRevealComplete()) {
+            val buttonTop = GameConstants.SIDE_BUTTON_TOP
+            val buttonBottom = height - GameConstants.SIDE_BUTTON_BOTTOM_MARGIN
+            val label = if (engine.isMazeRouteVisible) "hide" else "route"
+
+            if (buttonBottom > buttonTop) {
+                // Left button
+                paint.color = Color.argb(80, 150, 120, 80)
+                canvas.drawRect(0f, buttonTop, GameConstants.GRID_LEFT, buttonBottom, paint)
+                paint.color = Color.argb(255, 255, 255, 255)
+                paint.textSize = 28f
+                canvas.save()
+                canvas.rotate(90f, GameConstants.GRID_LEFT / 2, (buttonTop + buttonBottom) / 2)
+                canvas.drawText(label, GameConstants.GRID_LEFT / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
+                canvas.restore()
+
+                // Right button
+                val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
+                paint.color = Color.argb(80, 150, 120, 80)
+                canvas.drawRect(rightButtonX, buttonTop, width.toFloat(), buttonBottom, paint)
+                paint.color = Color.argb(255, 255, 255, 255)
+                canvas.save()
+                canvas.rotate(-90f, rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2, (buttonTop + buttonBottom) / 2)
+                canvas.drawText(label, rightButtonX + GameConstants.GRID_RIGHT_MARGIN / 2 - 30f, (buttonTop + buttonBottom) / 2 + 10f, paint)
                 canvas.restore()
             }
         }
@@ -399,16 +426,28 @@ class FluidTetrisView @JvmOverloads constructor(
                 }
                 // Next button touch detection (left and right side buttons)
                 if (!engine.isPaused && !engine.isGameOver && !engine.isMazeActive) {
-                    val buttonTopMargin = 400f
-                    val buttonBottomMargin = height - 170f
-                    val buttonTop = buttonTopMargin
-                    val buttonBottom = buttonBottomMargin
+                    val buttonTop = GameConstants.SIDE_BUTTON_TOP
+                    val buttonBottom = height - GameConstants.SIDE_BUTTON_BOTTOM_MARGIN
                     val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
 
                     if (buttonBottom > buttonTop &&
                         ((event.x in 0f..GameConstants.GRID_LEFT && event.y in buttonTop..buttonBottom) ||
                          (event.x in rightButtonX..width.toFloat() && event.y in buttonTop..buttonBottom))) {
                         engine.onNextPieceButton(width, height)
+                        invalidate()
+                        return true
+                    }
+                }
+                // Route-hint button touch detection (left and right side buttons), maze mode only
+                if (!engine.isPaused && engine.isMazeActive && engine.isMazeRevealComplete()) {
+                    val buttonTop = GameConstants.SIDE_BUTTON_TOP
+                    val buttonBottom = height - GameConstants.SIDE_BUTTON_BOTTOM_MARGIN
+                    val rightButtonX = width - GameConstants.GRID_RIGHT_MARGIN
+
+                    if (buttonBottom > buttonTop &&
+                        ((event.x in 0f..GameConstants.GRID_LEFT && event.y in buttonTop..buttonBottom) ||
+                         (event.x in rightButtonX..width.toFloat() && event.y in buttonTop..buttonBottom))) {
+                        engine.toggleMazeRoute()
                         invalidate()
                         return true
                     }
@@ -508,6 +547,18 @@ class FluidTetrisView @JvmOverloads constructor(
             if (cell.east) canvas.drawLine(right, top, right, bottom, paint)
         }
         paint.style = Paint.Style.FILL
+
+        if (engine.isMazeRouteVisible) {
+            paint.color = Color.argb(200, 255, 210, 60)
+            val dotRadius = minOf(cellWidth, cellHeight) * GameConstants.MAZE_ROUTE_DOT_RADIUS_FRACTION
+            val routeCells = engine.mazeRouteCells()
+            for (i in 1 until routeCells.size) {
+                val (row, col) = routeCells[i]
+                val cx = gridLeft + (col + 0.5f) * cellWidth
+                val cy = gridTop + (row + 0.5f) * cellHeight
+                canvas.drawCircle(cx, cy, dotRadius, paint)
+            }
+        }
 
         if (engine.isMazeRevealComplete()) {
             paint.color = Color.argb(255, 0, 210, 255)

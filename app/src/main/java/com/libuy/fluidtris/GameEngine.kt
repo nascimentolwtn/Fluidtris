@@ -77,6 +77,9 @@ internal class GameEngine(
         private set
     var mazeExitCol = 0
         private set
+    var isMazeRouteVisible = false
+        private set
+    private var mazeRoute: List<Pair<Int, Int>> = emptyList()
 
     // ── Backward-compat properties (tests and FluidTetrisView use these) ──────
 
@@ -206,6 +209,8 @@ internal class GameEngine(
         mazeVisitOrder = emptyList()
         mazePlayerRow = 0
         mazePlayerCol = 0
+        isMazeRouteVisible = false
+        mazeRoute = emptyList()
 
         val pieceType = Random.nextInt(GameConstants.PIECES.size)
         fallingPieces.add(ActivePiece(
@@ -405,7 +410,9 @@ internal class GameEngine(
         fallingPieces.clear()
         draggedPiece = null
 
-        val result = MazeGenerator.generate(GameConstants.GRID_COLUMNS, GameConstants.GRID_ROWS, mazeRandom)
+        val result = MazeGenerator.generate(
+            GameConstants.GRID_COLUMNS, GameConstants.GRID_ROWS, mazeRandom, GameConstants.MAZE_BRAID_PERCENT
+        )
         maze = result.grid
         mazeVisitOrder = result.visitOrder
         mazePlayerRow = 0
@@ -413,6 +420,8 @@ internal class GameEngine(
         mazeExitRow = GameConstants.GRID_ROWS - 1
         mazeExitCol = GameConstants.GRID_COLUMNS - 1
         mazeRevealStartMs = currentTimeMs()
+        isMazeRouteVisible = false
+        mazeRoute = emptyList()
         isMazeActive = true
         onMazeStart()
     }
@@ -421,11 +430,29 @@ internal class GameEngine(
         isMazeActive = false
         maze = null
         mazeVisitOrder = emptyList()
+        isMazeRouteVisible = false
+        mazeRoute = emptyList()
         onMazeSolved()
         spawnNextPiece(viewWidth, viewHeight)
     }
 
     fun mazeCellAt(row: Int, col: Int): MazeCell? = maze?.getOrNull(row)?.getOrNull(col)
+
+    // Toggles the shortest-path hint from the player's current cell to the exit.
+    fun toggleMazeRoute() {
+        if (!isMazeActive || !isMazeRevealComplete()) return
+        if (isMazeRouteVisible) {
+            isMazeRouteVisible = false
+            mazeRoute = emptyList()
+            return
+        }
+        val mazeGrid = maze ?: return
+        mazeRoute = MazeSolver.shortestPath(mazeGrid, mazePlayerRow, mazePlayerCol, mazeExitRow, mazeExitCol)
+        isMazeRouteVisible = true
+    }
+
+    // The currently displayed shortest-path hint, in order from the player's cell to the exit.
+    fun mazeRouteCells(): List<Pair<Int, Int>> = mazeRoute
 
     fun mazeRevealFraction(): Float {
         if (!isMazeActive) return 0f
@@ -459,6 +486,13 @@ internal class GameEngine(
         mazePlayerCol = newCol
         if (mazePlayerRow == mazeExitRow && mazePlayerCol == mazeExitCol) {
             completeMaze(viewWidth, viewHeight)
+        } else if (isMazeRouteVisible) {
+            val mazeGrid = maze
+            mazeRoute = if (mazeGrid != null) {
+                MazeSolver.shortestPath(mazeGrid, mazePlayerRow, mazePlayerCol, mazeExitRow, mazeExitCol)
+            } else {
+                emptyList()
+            }
         }
         return true
     }

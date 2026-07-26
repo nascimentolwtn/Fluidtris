@@ -16,11 +16,13 @@ internal data class MazeResult(
     val visitOrder: List<Pair<Int, Int>>
 )
 
-// Generates a perfect maze (exactly one path between any two cells) sized columns x rows,
-// via iterative randomized depth-first backtracking starting at (0, 0).
+// Generates a maze sized columns x rows via iterative randomized depth-first backtracking
+// starting at (0, 0). With braidPercent = 0 (default) the result is a perfect maze (exactly
+// one path between any two cells); a positive braidPercent opens a fraction of dead ends
+// into loops, so solvers may have more than one valid route to the exit.
 internal object MazeGenerator {
 
-    fun generate(columns: Int, rows: Int, random: Random = Random.Default): MazeResult {
+    fun generate(columns: Int, rows: Int, random: Random = Random.Default, braidPercent: Float = 0f): MazeResult {
         val grid = Array(rows) { Array(columns) { MazeCell() } }
         val visited = Array(rows) { BooleanArray(columns) }
         val visitOrder = mutableListOf<Pair<Int, Int>>()
@@ -45,7 +47,46 @@ internal object MazeGenerator {
             stack.addLast(nRow to nCol)
         }
 
+        braid(grid, columns, rows, braidPercent, random)
+
         return MazeResult(grid, visitOrder)
+    }
+
+    // Opens a fraction of dead-end cells (exactly one carved opening) into an adjacent
+    // standing wall, creating a loop and therefore an alternate route. Dead ends and their
+    // fate are decided in fixed row/col order, consuming `random` deterministically.
+    private fun braid(grid: Array<Array<MazeCell>>, columns: Int, rows: Int, braidPercent: Float, random: Random) {
+        if (braidPercent <= 0f) return
+        for (row in 0 until rows) {
+            for (col in 0 until columns) {
+                val cell = grid[row][col]
+                if (standingWallCount(cell) != 3) continue
+                if (random.nextFloat() >= braidPercent) continue
+                val candidates = standingWallNeighbors(row, col, cell, columns, rows)
+                if (candidates.isEmpty()) continue
+                val (nRow, nCol, dir) = candidates[random.nextInt(candidates.size)]
+                carveWall(grid, row, col, nRow, nCol, dir)
+            }
+        }
+    }
+
+    private fun standingWallCount(cell: MazeCell): Int =
+        listOf(cell.north, cell.south, cell.east, cell.west).count { it }
+
+    // Standing walls whose neighbor cell is in bounds (excludes boundary walls, which have
+    // no neighbor to carve into).
+    private fun standingWallNeighbors(
+        row: Int, col: Int, cell: MazeCell, columns: Int, rows: Int
+    ): List<Triple<Int, Int, Char>> {
+        val candidates = listOf(
+            Triple(row - 1, col, 'N') to cell.north,
+            Triple(row + 1, col, 'S') to cell.south,
+            Triple(row, col + 1, 'E') to cell.east,
+            Triple(row, col - 1, 'W') to cell.west
+        )
+        return candidates.filter { (pos, standing) ->
+            standing && pos.first in 0 until rows && pos.second in 0 until columns
+        }.map { it.first }
     }
 
     private fun unvisitedNeighbors(
