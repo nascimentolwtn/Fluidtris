@@ -227,6 +227,7 @@ internal class GameEngine(
     }
 
     fun onTouchDown(x: Float, y: Float): Boolean {
+        if (isPaused) return false
         for (piece in fallingPieces) {
             val hitCell = hitCellFromTouch(x, y, piece.x, piece.y, piece.rotation, GameConstants.PIECES[piece.type])
             if (hitCell != null) {
@@ -244,6 +245,7 @@ internal class GameEngine(
     }
 
     fun onTouchMove(x: Float, y: Float, viewWidth: Int, viewHeight: Int) {
+        if (isPaused) return
         val piece = draggedPiece ?: return
         val dx = x - lastTouchX
         val dy = y - lastTouchY
@@ -407,6 +409,10 @@ internal class GameEngine(
                 grid[i][j] = null
             }
         }
+        // Deliberate: a maze replaces the whole play area, not just the piece that happened to
+        // trigger the level-up. Any other pieces independently falling or snap-animating (the
+        // multi-piece feature lets several fall at once) are swept away too, not just locked
+        // ones — onMazeStart() below is the single feedback cue for this whole transition.
         fallingPieces.clear()
         draggedPiece = null
 
@@ -440,7 +446,7 @@ internal class GameEngine(
 
     // Toggles the shortest-path hint from the player's current cell to the exit.
     fun toggleMazeRoute() {
-        if (!isMazeActive || !isMazeRevealComplete()) return
+        if (!isMazeActive || isPaused || !isMazeRevealComplete()) return
         if (isMazeRouteVisible) {
             isMazeRouteVisible = false
             mazeRoute = emptyList()
@@ -469,7 +475,7 @@ internal class GameEngine(
     }
 
     fun attemptMazeMove(direction: MazeDirection, viewWidth: Int, viewHeight: Int): Boolean {
-        if (!isMazeActive || !isMazeRevealComplete()) return false
+        if (!isMazeActive || isPaused || !isMazeRevealComplete()) return false
         val cell = mazeCellAt(mazePlayerRow, mazePlayerCol) ?: return false
         val (dRow, dCol, wallStanding) = when (direction) {
             MazeDirection.UP -> Triple(-1, 0, cell.north)
