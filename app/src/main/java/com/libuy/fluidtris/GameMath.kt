@@ -125,6 +125,13 @@ internal fun lerpAngleDeg(from: Float, to: Float, t: Float): Float {
     return from + delta * t
 }
 
+// True when advancing from prevLevel to newLevel crosses a multiple of `interval`
+// (e.g. interval=5 triggers going from level 4 to 6, but not 6 to 7). interval<=0 disables it.
+internal fun crossedMazeMilestone(prevLevel: Int, newLevel: Int, interval: Int): Boolean {
+    if (interval <= 0) return false
+    return newLevel / interval > prevLevel / interval
+}
+
 // Rotate a tetris piece shape around its center. Handles non-square shapes correctly.
 // For 90° CW: (r,c) → (c, rows-1-r) producing a cols×rows output.
 // For 270° CW: (r,c) → (cols-1-c, r) producing a cols×rows output.

@@ -32,6 +32,8 @@ class FluidTetrisView @JvmOverloads constructor(
 
     private val paint = Paint().apply { style = Paint.Style.FILL }
     private val jellyRect = RectF()
+    private var mazeTouchRefX = 0f
+    private var mazeTouchRefY = 0f
     private val backgroundBitmap: Bitmap =
         BitmapFactory.decodeResource(resources, R.drawable.game_background)
 
@@ -49,7 +51,9 @@ class FluidTetrisView @JvmOverloads constructor(
             } else {
                 soundManager.playGameOverSound()
             }
-        }
+        },
+        onMazeStart = { soundManager.playLevelUpSound() },
+        onMazeSolved = { soundManager.playMove() }
     )
     private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {
@@ -90,62 +94,66 @@ class FluidTetrisView @JvmOverloads constructor(
         canvas.drawRect(gridLeft, gridTop, gridRight, gridBottom, paint)
         paint.style = Paint.Style.FILL
 
-        for (i in 0 until GameConstants.GRID_ROWS) {
-            for (j in 0 until GameConstants.GRID_COLUMNS) {
-                engine.grid[i][j]?.let { color ->
-                    paint.color = color
-                    canvas.drawRect(gridLeft + j * cellWidth, gridTop + i * cellHeight,
-                        gridLeft + (j + 1) * cellWidth, gridTop + (i + 1) * cellHeight, paint)
-                    paint.color = Color.BLACK
-                    paint.style = Paint.Style.STROKE
-                    paint.strokeWidth = 2f
-                    canvas.drawRect(gridLeft + j * cellWidth, gridTop + i * cellHeight,
-                        gridLeft + (j + 1) * cellWidth, gridTop + (i + 1) * cellHeight, paint)
-                    paint.style = Paint.Style.FILL
+        if (engine.isMazeActive) {
+            drawMaze(canvas, gridLeft, gridTop, cellWidth, cellHeight)
+        } else {
+            for (i in 0 until GameConstants.GRID_ROWS) {
+                for (j in 0 until GameConstants.GRID_COLUMNS) {
+                    engine.grid[i][j]?.let { color ->
+                        paint.color = color
+                        canvas.drawRect(gridLeft + j * cellWidth, gridTop + i * cellHeight,
+                            gridLeft + (j + 1) * cellWidth, gridTop + (i + 1) * cellHeight, paint)
+                        paint.color = Color.BLACK
+                        paint.style = Paint.Style.STROKE
+                        paint.strokeWidth = 2f
+                        canvas.drawRect(gridLeft + j * cellWidth, gridTop + i * cellHeight,
+                            gridLeft + (j + 1) * cellWidth, gridTop + (i + 1) * cellHeight, paint)
+                        paint.style = Paint.Style.FILL
+                    }
                 }
             }
-        }
 
-        val pieceSize = GameConstants.PIECE_SIZE
+            val pieceSize = GameConstants.PIECE_SIZE
 
-        for (piece in engine.fallingPieces) {
-            val shape = GameConstants.PIECES[piece.type]
-            val solidity = engine.getCollisionSolidity(piece)
-            val fluidBlockSize = pieceSize - (1f - solidity) * 4f
-            val drawOffsetX = shape[0].size * (pieceSize - fluidBlockSize) / 2f
-            val drawOffsetY = shape.size * (pieceSize - fluidBlockSize) / 2f
+            for (piece in engine.fallingPieces) {
+                val shape = GameConstants.PIECES[piece.type]
+                val solidity = engine.getCollisionSolidity(piece)
+                val fluidBlockSize = pieceSize - (1f - solidity) * 4f
+                val drawOffsetX = shape[0].size * (pieceSize - fluidBlockSize) / 2f
+                val drawOffsetY = shape.size * (pieceSize - fluidBlockSize) / 2f
+                canvas.save()
+                canvas.rotate(piece.rotation,
+                    piece.x + (shape[0].size * pieceSize) / 2,
+                    piece.y + (shape.size * pieceSize) / 2)
+                drawJellyPiece(canvas, shape,
+                    piece.x + drawOffsetX, piece.y + drawOffsetY,
+                    piece.color, solidity, fluidBlockSize)
+                canvas.restore()
+            }
+
+            val nextShape = GameConstants.PIECES[engine.nextPiece]
+            val previewBlockSize = 50f
+            val previewCols = nextShape[0].size
+            val previewRows = nextShape.size
+            val previewBoxSize = 160f
+            val previewX = width - previewBoxSize - 20f
+            val previewY = 20f
+            paint.color = Color.argb(180, 20, 60, 100)
+            canvas.drawRect(previewX - 8f, previewY - 8f,
+                previewX + previewBoxSize + 8f, previewY + previewBoxSize + 8f, paint)
+            val pieceDrawX = previewX + (previewBoxSize - previewCols * previewBlockSize) / 2f
+            val pieceDrawY = previewY + (previewBoxSize - previewRows * previewBlockSize) / 2f
+            val previewCenterX = previewX + previewBoxSize / 2f
+            val previewCenterY = previewY + previewBoxSize / 2f
             canvas.save()
-            canvas.rotate(piece.rotation,
-                piece.x + (shape[0].size * pieceSize) / 2,
-                piece.y + (shape.size * pieceSize) / 2)
-            drawJellyPiece(canvas, shape,
-                piece.x + drawOffsetX, piece.y + drawOffsetY,
-                piece.color, solidity, fluidBlockSize)
+            canvas.rotate(engine.nextPieceRotation, previewCenterX, previewCenterY)
+            drawJellyPiece(canvas, nextShape, pieceDrawX, pieceDrawY,
+                engine.nextPieceColor, 1f, previewBlockSize)
             canvas.restore()
         }
 
-        val nextShape = GameConstants.PIECES[engine.nextPiece]
-        val previewBlockSize = 50f
-        val previewCols = nextShape[0].size
-        val previewRows = nextShape.size
-        val previewBoxSize = 160f
-        val previewX = width - previewBoxSize - 20f
-        val previewY = 20f
-        paint.color = Color.argb(180, 20, 60, 100)
-        canvas.drawRect(previewX - 8f, previewY - 8f,
-            previewX + previewBoxSize + 8f, previewY + previewBoxSize + 8f, paint)
-        val pieceDrawX = previewX + (previewBoxSize - previewCols * previewBlockSize) / 2f
-        val pieceDrawY = previewY + (previewBoxSize - previewRows * previewBlockSize) / 2f
-        val previewCenterX = previewX + previewBoxSize / 2f
-        val previewCenterY = previewY + previewBoxSize / 2f
-        canvas.save()
-        canvas.rotate(engine.nextPieceRotation, previewCenterX, previewCenterY)
-        drawJellyPiece(canvas, nextShape, pieceDrawX, pieceDrawY,
-            engine.nextPieceColor, 1f, previewBlockSize)
-        canvas.restore()
-
         // Next buttons (left and right, between sound toggles and bottom buttons)
-        if (!engine.isGameOver && !engine.isPaused) {
+        if (!engine.isGameOver && !engine.isPaused && !engine.isMazeActive) {
             val buttonTopMargin = 400f  // below BG music toggle (280–380)
             val buttonBottomMargin = height - 170f  // above bottom buttons (height-150 to height-50)
             val buttonTop = buttonTopMargin
@@ -390,7 +398,7 @@ class FluidTetrisView @JvmOverloads constructor(
                     return true
                 }
                 // Next button touch detection (left and right side buttons)
-                if (!engine.isPaused && !engine.isGameOver) {
+                if (!engine.isPaused && !engine.isGameOver && !engine.isMazeActive) {
                     val buttonTopMargin = 400f
                     val buttonBottomMargin = height - 170f
                     val buttonTop = buttonTopMargin
@@ -405,8 +413,18 @@ class FluidTetrisView @JvmOverloads constructor(
                         return true
                     }
                 }
+                // Fallback: any remaining touch-down while solving a maze starts a swipe gesture.
+                if (!engine.isPaused && engine.isMazeActive) {
+                    mazeTouchRefX = event.x
+                    mazeTouchRefY = event.y
+                    return true
+                }
             }
             MotionEvent.ACTION_MOVE -> {
+                if (engine.isMazeActive) {
+                    if (handleMazeSwipe(event.x, event.y)) invalidate()
+                    return true
+                }
                 if (engine.isDragging) {
                     engine.onTouchMove(event.x, event.y, width, height)
                     invalidate()
@@ -441,6 +459,70 @@ class FluidTetrisView @JvmOverloads constructor(
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         soundManager.stopBgMusic()
+    }
+
+    // Drags of at least half a cell move the player one step; the reference point then resets
+    // so a continued drag can chain further steps, matching the game's fluid-drag feel.
+    private fun handleMazeSwipe(x: Float, y: Float): Boolean {
+        val cellWidth = (width - GameConstants.GRID_LEFT - GameConstants.GRID_RIGHT_MARGIN) / GameConstants.GRID_COLUMNS
+        val cellHeight = (height - GameConstants.GRID_TOP - GameConstants.GRID_BOTTOM_MARGIN) / GameConstants.GRID_ROWS
+        val dx = x - mazeTouchRefX
+        val dy = y - mazeTouchRefY
+
+        val moved = if (kotlin.math.abs(dx) > cellWidth * 0.5f && kotlin.math.abs(dx) >= kotlin.math.abs(dy)) {
+            engine.attemptMazeMove(if (dx > 0) MazeDirection.RIGHT else MazeDirection.LEFT, width, height)
+        } else if (kotlin.math.abs(dy) > cellHeight * 0.5f) {
+            engine.attemptMazeMove(if (dy > 0) MazeDirection.DOWN else MazeDirection.UP, width, height)
+        } else {
+            false
+        }
+
+        if (moved) {
+            mazeTouchRefX = x
+            mazeTouchRefY = y
+        }
+        return moved
+    }
+
+    private fun drawMaze(canvas: Canvas, gridLeft: Float, gridTop: Float, cellWidth: Float, cellHeight: Float) {
+        paint.style = Paint.Style.FILL
+        paint.color = Color.argb(180, 80, 220, 120)
+        canvas.drawRect(
+            gridLeft + engine.mazeExitCol * cellWidth + 6f, gridTop + engine.mazeExitRow * cellHeight + 6f,
+            gridLeft + (engine.mazeExitCol + 1) * cellWidth - 6f, gridTop + (engine.mazeExitRow + 1) * cellHeight - 6f,
+            paint
+        )
+
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 6f
+        paint.color = Color.argb(255, 235, 235, 245)
+        for ((row, col) in engine.mazeRevealedCells()) {
+            val cell = engine.mazeCellAt(row, col) ?: continue
+            val left = gridLeft + col * cellWidth
+            val top = gridTop + row * cellHeight
+            val right = left + cellWidth
+            val bottom = top + cellHeight
+            if (cell.north) canvas.drawLine(left, top, right, top, paint)
+            if (cell.south) canvas.drawLine(left, bottom, right, bottom, paint)
+            if (cell.west) canvas.drawLine(left, top, left, bottom, paint)
+            if (cell.east) canvas.drawLine(right, top, right, bottom, paint)
+        }
+        paint.style = Paint.Style.FILL
+
+        if (engine.isMazeRevealComplete()) {
+            paint.color = Color.argb(255, 0, 210, 255)
+            val cx = gridLeft + (engine.mazePlayerCol + 0.5f) * cellWidth
+            val cy = gridTop + (engine.mazePlayerRow + 0.5f) * cellHeight
+            canvas.drawCircle(cx, cy, minOf(cellWidth, cellHeight) * 0.32f, paint)
+
+            paint.color = Color.argb(220, 255, 255, 255)
+            paint.textSize = 30f
+            canvas.drawText("Find the green exit!", gridLeft + 10f, gridTop + 65f, paint)
+        } else {
+            paint.color = Color.argb(220, 255, 255, 255)
+            paint.textSize = 30f
+            canvas.drawText("Maze incoming…", gridLeft + 10f, gridTop + 65f, paint)
+        }
     }
 
     private fun drawJellyPiece(

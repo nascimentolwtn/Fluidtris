@@ -23,6 +23,11 @@ internal object GameConstants {
     const val GRID_RIGHT_MARGIN = 100f
     const val GRID_BOTTOM_MARGIN = 180f
 
+    // Every MAZE_LEVEL_INTERVAL levels the play area becomes a maze the player must solve
+    // before Fluidtris resumes. 0 disables the feature entirely.
+    const val MAZE_LEVEL_INTERVAL = 5
+    const val MAZE_REVEAL_DURATION_MS = 2000L
+
     val PIECES: List<List<List<Int>>> = listOf(
         listOf(listOf(1, 1, 1, 1)),              // I
         listOf(listOf(1, 1), listOf(1, 1)),       // O

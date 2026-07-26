@@ -4,6 +4,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
+enum class MazeDirection { UP, DOWN, LEFT, RIGHT }
+
 data class ActivePiece(
     var type: Int,
     var color: Int,
@@ -29,7 +31,9 @@ internal class GameEngine(
     private val onLineCleared: () -> Unit,
     private val onHighScoreBeat: (newScore: Int) -> Unit = {},
     private val onLevelUp: () -> Unit = {},
-    private val onGameOver: (beatHighScore: Boolean) -> Unit = {}
+    private val onGameOver: (beatHighScore: Boolean) -> Unit = {},
+    private val onMazeStart: () -> Unit = {},
+    private val onMazeSolved: () -> Unit = {}
 ) {
     val grid = Array(GameConstants.GRID_ROWS) { Array<Int?>(GameConstants.GRID_COLUMNS) { null } }
     var score = 0
@@ -56,6 +60,23 @@ internal class GameEngine(
     var nextPieceRotation = 0f
 
     internal var currentTimeMs: () -> Long = System::currentTimeMillis
+
+    // ── Maze mode state ─────────────────────────────────────────────────────
+
+    internal var mazeRandom: Random = Random.Default
+    var isMazeActive = false
+        private set
+    private var maze: Array<Array<MazeCell>>? = null
+    private var mazeVisitOrder: List<Pair<Int, Int>> = emptyList()
+    private var mazeRevealStartMs = 0L
+    var mazePlayerRow = 0
+        private set
+    var mazePlayerCol = 0
+        private set
+    var mazeExitRow = 0
+        private set
+    var mazeExitCol = 0
+        private set
 
     // ── Backward-compat properties (tests and FluidTetrisView use these) ──────
 
@@ -94,6 +115,7 @@ internal class GameEngine(
     fun update(viewWidth: Int, viewHeight: Int) {
         if (viewWidth == 0 || viewHeight == 0) return
         if (isPaused || isGameOver) return
+        if (isMazeActive) return
 
         if (fallingPieces.isEmpty()) spawnNextPiece(viewWidth, viewHeight)
 
@@ -179,6 +201,11 @@ internal class GameEngine(
         justBeatHighScore = false
         isBeatingHighScore = false
         fallingPieces.clear()
+        isMazeActive = false
+        maze = null
+        mazeVisitOrder = emptyList()
+        mazePlayerRow = 0
+        mazePlayerCol = 0
 
         val pieceType = Random.nextInt(GameConstants.PIECES.size)
         fallingPieces.add(ActivePiece(
@@ -352,7 +379,7 @@ internal class GameEngine(
     }
 
     fun onNextPieceButton(viewWidth: Int, viewHeight: Int) {
-        if (isGameOver || isPaused) return
+        if (isGameOver || isPaused || isMazeActive) return
         draggedPiece = null
         val newPiece = ActivePiece(
             type = nextPiece,
@@ -365,6 +392,75 @@ internal class GameEngine(
         nextPiece = Random.nextInt(GameConstants.PIECES.size)
         nextPieceColor = GameConstants.PIECE_COLORS[nextPiece]
         nextPieceRotation = Random.nextInt(4) * 90f
+    }
+
+    // ── Maze mode ────────────────────────────────────────────────────────────
+
+    private fun beginMaze() {
+        for (i in 0 until GameConstants.GRID_ROWS) {
+            for (j in 0 until GameConstants.GRID_COLUMNS) {
+                grid[i][j] = null
+            }
+        }
+        fallingPieces.clear()
+        draggedPiece = null
+
+        val result = MazeGenerator.generate(GameConstants.GRID_COLUMNS, GameConstants.GRID_ROWS, mazeRandom)
+        maze = result.grid
+        mazeVisitOrder = result.visitOrder
+        mazePlayerRow = 0
+        mazePlayerCol = 0
+        mazeExitRow = GameConstants.GRID_ROWS - 1
+        mazeExitCol = GameConstants.GRID_COLUMNS - 1
+        mazeRevealStartMs = currentTimeMs()
+        isMazeActive = true
+        onMazeStart()
+    }
+
+    private fun completeMaze(viewWidth: Int, viewHeight: Int) {
+        isMazeActive = false
+        maze = null
+        mazeVisitOrder = emptyList()
+        onMazeSolved()
+        spawnNextPiece(viewWidth, viewHeight)
+    }
+
+    fun mazeCellAt(row: Int, col: Int): MazeCell? = maze?.getOrNull(row)?.getOrNull(col)
+
+    fun mazeRevealFraction(): Float {
+        if (!isMazeActive) return 0f
+        val elapsed = currentTimeMs() - mazeRevealStartMs
+        return (elapsed / GameConstants.MAZE_REVEAL_DURATION_MS.toFloat()).coerceIn(0f, 1f)
+    }
+
+    fun isMazeRevealComplete(): Boolean = isMazeActive && mazeRevealFraction() >= 1f
+
+    // Cells revealed so far, in carve order — draw their walls to animate the maze materializing.
+    fun mazeRevealedCells(): List<Pair<Int, Int>> {
+        val count = (mazeRevealFraction() * mazeVisitOrder.size).toInt().coerceIn(0, mazeVisitOrder.size)
+        return mazeVisitOrder.subList(0, count)
+    }
+
+    fun attemptMazeMove(direction: MazeDirection, viewWidth: Int, viewHeight: Int): Boolean {
+        if (!isMazeActive || !isMazeRevealComplete()) return false
+        val cell = mazeCellAt(mazePlayerRow, mazePlayerCol) ?: return false
+        val (dRow, dCol, wallStanding) = when (direction) {
+            MazeDirection.UP -> Triple(-1, 0, cell.north)
+            MazeDirection.DOWN -> Triple(1, 0, cell.south)
+            MazeDirection.LEFT -> Triple(0, -1, cell.west)
+            MazeDirection.RIGHT -> Triple(0, 1, cell.east)
+        }
+        if (wallStanding) return false
+        val newRow = mazePlayerRow + dRow
+        val newCol = mazePlayerCol + dCol
+        if (newRow !in 0 until GameConstants.GRID_ROWS || newCol !in 0 until GameConstants.GRID_COLUMNS) return false
+
+        mazePlayerRow = newRow
+        mazePlayerCol = newCol
+        if (mazePlayerRow == mazeExitRow && mazePlayerCol == mazeExitCol) {
+            completeMaze(viewWidth, viewHeight)
+        }
+        return true
     }
 
     // ── Internal lock / spawn ─────────────────────────────────────────────────
@@ -417,11 +513,11 @@ internal class GameEngine(
         if (draggedPiece === piece) draggedPiece = null
         fallingPieces.remove(piece)
 
-        if (fallingPieces.isEmpty()) {
+        if (fallingPieces.isEmpty() && !isMazeActive) {
             spawnNextPiece(viewWidth, viewHeight)
         }
 
-        if (grid[0].any { it != null }) {
+        if (!isMazeActive && grid[0].any { it != null }) {
             isGameOver = true
             onGameOver(justBeatHighScore)
         }
@@ -472,7 +568,12 @@ internal class GameEngine(
                 onHighScoreBeat(score)
             }
             onLineCleared()
-            if (newLevel > prevLevel) onLevelUp()
+            if (newLevel > prevLevel) {
+                onLevelUp()
+                if (crossedMazeMilestone(prevLevel, newLevel, GameConstants.MAZE_LEVEL_INTERVAL)) {
+                    beginMaze()
+                }
+            }
             return true
         }
         return false
