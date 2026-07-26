@@ -74,6 +74,9 @@
 9. **[2026-06-15] Feature: add ads**
    Do instead: integrate ad framework (Google Mobile Ads SDK). Show ads at three points: (a) mid-game banner/interstitial, (b) during pause menu, (c) during game-over screen. Define placement strategy and frequency.
 
+10. **[2026-07-26] Feature: maze route-assist (multiple paths + show-route + recalculate)**
+    Do instead: generate mazes with multiple valid paths to the exit (not a strict perfect/single-solution maze) so solving feels less rigid. Add a "show route" button that reveals the shortest path from the player's current cell to the exit. While the route is displayed, if the player deviates onto a different path, recalculate and redisplay the route from the new position. Builds on maze mode in `GameEngine.kt` / `MazeGenerator.kt`.
+
 ## Done
 - **[2026-06-18] Feature: fluid snap release — any drag cancels snap animation** — dragging a snap-animating piece (center drag or rotation) immediately cancels snap state and returns piece to fluid. Center drag into open space slides freely; center drag into a solid block reverts position, sets bounce spring (`springForceX = -dx * SPRING_CARRY`), and releases drag. Rotation gesture cancels snap and applies rotation torque inline. Normal drag collision also sets bounce spring. Fix: `turnPieceRigidInternal` grid write guarded by `grid[gy][gx] == null` to prevent overwrites on full-stack force-lock.
 - **[2026-06-18] Polish: side buttons respect UI layout** — Replaced square "Next" buttons (180x180) with elongated side buttons using grid margins. Left button spans `0..GRID_LEFT` (100f), right button spans `(width - GRID_RIGHT_MARGIN)..width`. Vertically positioned between sound toggles (after y: 400) and bottom buttons (before y: height-170), with proper margins. Vertical "next" text rotated 90°/-90° on each side. Touch detection updated for new bounds. Commit `eb7cc23`.
