@@ -87,4 +87,31 @@ class GameEngineStateTest {
         e.update(VW, VH)
         assertEquals(startY + GameConstants.GRAVITY, e.pieceY, 0.001f)
     }
+
+    // ---- touch handling while paused ----
+    // A stray touch/move event that arrives after onFocusLost() force-pauses the game (e.g. a
+    // drag in progress when the app loses focus, with no matching ACTION_UP/CANCEL delivered)
+    // must not move anything. Guarding here, inside GameEngine, is authoritative regardless of
+    // whether the calling View re-checks isPaused before forwarding the event.
+
+    @Test
+    fun onTouchDown_whenPaused_returnsFalseAndDoesNotGrabPiece() {
+        val e = engine()
+        e.isPaused = true
+        assertFalse(e.onTouchDown(e.pieceX + 50f, e.pieceY + 50f))
+        assertFalse(e.isDragging)
+    }
+
+    @Test
+    fun onTouchMove_whenPaused_pieceDoesNotMove() {
+        val e = engine()
+        e.currentPiece = 1 // O-piece: fully filled 2x2, simple hit-test target
+        assertTrue(e.onTouchDown(e.pieceX + 50f, e.pieceY + 50f))
+        e.isPaused = true
+        val startX = e.pieceX
+
+        e.onTouchMove(e.pieceX + 200f, e.pieceY + 50f, VW, VH)
+
+        assertEquals(startX, e.pieceX, 0.001f)
+    }
 }
