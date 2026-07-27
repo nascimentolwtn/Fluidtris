@@ -304,4 +304,63 @@ class GameEngineMazeTest {
         assertFalse(e.isMazeRouteVisible)
         assertTrue(e.mazeRouteCells().isEmpty())
     }
+
+    // ---- pause gating ----
+    // A stray touch/move event delivered after onFocusLost() force-pauses the game (e.g. mid-
+    // swipe when the app loses focus with no matching ACTION_UP) must not move the maze player
+    // or toggle the route hint. Guarding inside GameEngine is authoritative regardless of
+    // whether the calling View re-checks isPaused before forwarding the event.
+
+    @Test
+    fun attemptMazeMove_whenPaused_returnsFalseAndDoesNotMove() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+        mazeAtLevel5(e, { fakeTimeMs += it }, seed = 41)
+
+        e.pause()
+        val startCell = e.mazeCellAt(0, 0)!!
+        val direction = if (!startCell.south) MazeDirection.DOWN else MazeDirection.RIGHT
+
+        assertFalse(e.attemptMazeMove(direction, VW, VH))
+        assertEquals(0, e.mazePlayerRow)
+        assertEquals(0, e.mazePlayerCol)
+    }
+
+    @Test
+    fun toggleMazeRoute_whenPaused_isNoOp() {
+        var fakeTimeMs = 0L
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.currentTimeMs = { fakeTimeMs }
+        e.resetGame(VW, VH)
+        mazeAtLevel5(e, { fakeTimeMs += it }, seed = 42)
+
+        e.pause()
+        e.toggleMazeRoute()
+
+        assertFalse(e.isMazeRouteVisible)
+        assertTrue(e.mazeRouteCells().isEmpty())
+    }
+
+    // ---- sweeping other in-flight pieces ----
+
+    @Test
+    fun beginMaze_sweepsAllInFlightPieces_notJustTheLockingOne() {
+        val e = GameEngine(onPieceLocked = {}, onLineCleared = {})
+        e.resetGame(VW, VH)
+
+        // Spawn a second, independently falling piece alongside the original one.
+        e.onNextPieceButton(VW, VH)
+        assertEquals(2, e.fallingPieces.size)
+
+        for (col in 0 until GameConstants.GRID_COLUMNS) e.grid[GameConstants.GRID_ROWS - 1][col] = 0xFF0000
+        e.score = GameConstants.NEXT_LEVEL_SCORE * 4 - 100
+
+        e.checkLines()
+
+        assertTrue(e.isMazeActive)
+        assertTrue("All in-flight pieces must be swept when a maze begins, not just the one that triggered it",
+            e.fallingPieces.isEmpty())
+    }
 }
